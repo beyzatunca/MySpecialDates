@@ -1,0 +1,118 @@
+import Foundation
+import Combine
+import SwiftUI
+
+@MainActor
+class AuthViewModel: ObservableObject {
+    @Published var isAuthenticated = false
+    @Published var currentUser: User?
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    
+    // Form fields
+    @Published var email = ""
+    @Published var password = ""
+    @Published var firstName = ""
+    @Published var lastName = ""
+    @Published var phoneNumber = ""
+    @Published var birthDate = Date()
+    
+    // UI State
+    @Published var showingSignUp = false
+    @Published var showingError = false
+    
+    private let authService: AuthServiceProtocol
+    private var cancellables = Set<AnyCancellable>()
+    
+    init(authService: AuthServiceProtocol = AuthService()) {
+        self.authService = authService
+        setupBindings()
+    }
+    
+    // MARK: - Setup
+    private func setupBindings() {
+        // Monitor authentication state
+        $currentUser
+            .map { $0 != nil }
+            .assign(to: \.isAuthenticated, on: self)
+            .store(in: &cancellables)
+    }
+    
+    // MARK: - Sign In
+    func signIn() async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let user = try await authService.signIn(email: email, password: password)
+            currentUser = user
+            clearForm()
+        } catch {
+            errorMessage = error.localizedDescription
+            showingError = true
+        }
+        
+        isLoading = false
+    }
+    
+    // MARK: - Sign Up
+    func signUp() async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let user = try await authService.signUp(
+                email: email,
+                password: password,
+                firstName: firstName,
+                lastName: lastName,
+                phoneNumber: phoneNumber.isEmpty ? nil : phoneNumber,
+                birthDate: birthDate
+            )
+            currentUser = user
+            clearForm()
+        } catch {
+            errorMessage = error.localizedDescription
+            showingError = true
+        }
+        
+        isLoading = false
+    }
+    
+    // MARK: - Sign Out
+    func signOut() async {
+        do {
+            try await authService.signOut()
+            currentUser = nil
+        } catch {
+            errorMessage = error.localizedDescription
+            showingError = true
+        }
+    }
+    
+    // MARK: - Social Login
+    func signInWithFacebook() async {
+        // TODO: Implement Facebook login
+        print("Facebook login not implemented yet")
+    }
+    
+    func signInWithApple() async {
+        // TODO: Implement Apple login
+        print("Apple login not implemented yet")
+    }
+    
+    // MARK: - Helper Methods
+    private func clearForm() {
+        email = ""
+        password = ""
+        firstName = ""
+        lastName = ""
+        phoneNumber = ""
+        birthDate = Date()
+    }
+    
+    func dismissError() {
+        errorMessage = nil
+        showingError = false
+    }
+}
