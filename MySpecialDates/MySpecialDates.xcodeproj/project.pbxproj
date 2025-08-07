@@ -6,8 +6,25 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		946FE08A2E4532380027A0DB /* ValidationUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 946FE07B2E4532380027A0DB /* ValidationUtils.swift */; };
+		946FE08B2E4532380027A0DB /* UserRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 946FE0762E4532380027A0DB /* UserRepository.swift */; };
+		946FE08C2E4532380027A0DB /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 946FE07E2E4532380027A0DB /* LoginView.swift */; };
+		946FE08D2E4532380027A0DB /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = 946FE0782E4532380027A0DB /* User.swift */; };
+		946FE08E2E4532380027A0DB /* SignUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 946FE07F2E4532380027A0DB /* SignUpView.swift */; };
+		946FE08F2E4532380027A0DB /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 946FE0822E4532380027A0DB /* AuthViewModel.swift */; };
+		946FE0902E4532380027A0DB /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 946FE0812E4532380027A0DB /* AuthService.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		946FE0622E452F4C0027A0DB /* MySpecialDates.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MySpecialDates.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		946FE0762E4532380027A0DB /* UserRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserRepository.swift; sourceTree = "<group>"; };
+		946FE0782E4532380027A0DB /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
+		946FE07B2E4532380027A0DB /* ValidationUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValidationUtils.swift; sourceTree = "<group>"; };
+		946FE07E2E4532380027A0DB /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		946FE07F2E4532380027A0DB /* SignUpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpView.swift; sourceTree = "<group>"; };
+		946FE0812E4532380027A0DB /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		946FE0822E4532380027A0DB /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -32,6 +49,8 @@
 		946FE0592E452F4C0027A0DB = {
 			isa = PBXGroup;
 			children = (
+				946FE07D2E4532380027A0DB /* Core */,
+				946FE0892E4532380027A0DB /* Features */,
 				946FE0642E452F4C0027A0DB /* MySpecialDates */,
 				946FE0632E452F4C0027A0DB /* Products */,
 			);
@@ -43,6 +62,115 @@
 				946FE0622E452F4C0027A0DB /* MySpecialDates.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		946FE0772E4532380027A0DB /* Database */ = {
+			isa = PBXGroup;
+			children = (
+				946FE0762E4532380027A0DB /* UserRepository.swift */,
+			);
+			path = Database;
+			sourceTree = "<group>";
+		};
+		946FE0792E4532380027A0DB /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				946FE0782E4532380027A0DB /* User.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		946FE07A2E4532380027A0DB /* Network */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Network;
+			sourceTree = "<group>";
+		};
+		946FE07C2E4532380027A0DB /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				946FE07B2E4532380027A0DB /* ValidationUtils.swift */,
+			);
+			path = Utils;
+			sourceTree = "<group>";
+		};
+		946FE07D2E4532380027A0DB /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				946FE0772E4532380027A0DB /* Database */,
+				946FE0792E4532380027A0DB /* Models */,
+				946FE07A2E4532380027A0DB /* Network */,
+				946FE07C2E4532380027A0DB /* Utils */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		946FE0802E4532380027A0DB /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				946FE07E2E4532380027A0DB /* LoginView.swift */,
+				946FE07F2E4532380027A0DB /* SignUpView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		946FE0832E4532380027A0DB /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				946FE0802E4532380027A0DB /* Views */,
+				946FE0812E4532380027A0DB /* AuthService.swift */,
+				946FE0822E4532380027A0DB /* AuthViewModel.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		946FE0842E4532380027A0DB /* Chat */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Chat;
+			sourceTree = "<group>";
+		};
+		946FE0852E4532380027A0DB /* Contacts */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Contacts;
+			sourceTree = "<group>";
+		};
+		946FE0862E4532380027A0DB /* Events */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Events;
+			sourceTree = "<group>";
+		};
+		946FE0872E4532380027A0DB /* Reminders */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Reminders;
+			sourceTree = "<group>";
+		};
+		946FE0882E4532380027A0DB /* UserProfile */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = UserProfile;
+			sourceTree = "<group>";
+		};
+		946FE0892E4532380027A0DB /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				946FE0832E4532380027A0DB /* Auth */,
+				946FE0842E4532380027A0DB /* Chat */,
+				946FE0852E4532380027A0DB /* Contacts */,
+				946FE0862E4532380027A0DB /* Events */,
+				946FE0872E4532380027A0DB /* Reminders */,
+				946FE0882E4532380027A0DB /* UserProfile */,
+			);
+			path = Features;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -119,6 +247,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				946FE08A2E4532380027A0DB /* ValidationUtils.swift in Sources */,
+				946FE08B2E4532380027A0DB /* UserRepository.swift in Sources */,
+				946FE08C2E4532380027A0DB /* LoginView.swift in Sources */,
+				946FE08D2E4532380027A0DB /* User.swift in Sources */,
+				946FE08E2E4532380027A0DB /* SignUpView.swift in Sources */,
+				946FE08F2E4532380027A0DB /* AuthViewModel.swift in Sources */,
+				946FE0902E4532380027A0DB /* AuthService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

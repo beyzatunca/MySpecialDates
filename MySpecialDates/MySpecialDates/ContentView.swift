@@ -24,10 +24,10 @@ struct MainTabView: View {
                     Text("Ana Sayfa")
                 }
             
-            Text("Takvim")
+            EventsListView()
                 .tabItem {
                     Image(systemName: "calendar")
-                    Text("Takvim")
+                    Text("Etkinlikler")
                 }
             
             Text("Kişiler")
