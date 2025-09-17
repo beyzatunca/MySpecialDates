@@ -20,6 +20,8 @@ class AuthViewModel: ObservableObject {
     // UI State
     @Published var showingSignUp = false
     @Published var showingError = false
+    @Published var rememberMe = false
+    @Published var isLoggedIn = false
     
     private let authService: AuthServiceProtocol
     private var cancellables = Set<AnyCancellable>()
@@ -38,17 +40,34 @@ class AuthViewModel: ObservableObject {
             .store(in: &cancellables)
     }
     
-    // MARK: - Sign In
+    // MARK: - Sign In (Dummy Mode for Testing)
     func signIn() async {
         isLoading = true
         errorMessage = nil
         
-        do {
-            let user = try await authService.signIn(email: email, password: password)
-            currentUser = user
+        // Dummy delay to simulate network request
+        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        
+        // Dummy: Always successful login
+        if !email.isEmpty && !password.isEmpty {
+            // Create dummy user
+            let dummyUser = User(
+                id: "dummy-user-id",
+                firstName: "Tim",
+                lastName: "User",
+                email: email,
+                phoneNumber: "555-0123",
+                birthDate: Date(),
+                authType: .email,
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+            
+            currentUser = dummyUser
+            isLoggedIn = true
             clearForm()
-        } catch {
-            errorMessage = error.localizedDescription
+        } else {
+            errorMessage = "Please enter email and password"
             showingError = true
         }
         
@@ -66,7 +85,7 @@ class AuthViewModel: ObservableObject {
                 password: password,
                 firstName: firstName,
                 lastName: lastName,
-                phoneNumber: phoneNumber.isEmpty ? nil : phoneNumber,
+                phoneNumber: phoneNumber,
                 birthDate: birthDate
             )
             currentUser = user

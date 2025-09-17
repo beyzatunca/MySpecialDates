@@ -31,7 +31,7 @@ enum AuthError: Error, LocalizedError {
 }
 
 protocol AuthServiceProtocol {
-    func signUp(email: String, password: String, firstName: String, lastName: String, phoneNumber: String?, birthDate: Date) async throws -> User
+    func signUp(email: String, password: String, firstName: String, lastName: String, phoneNumber: String, birthDate: Date) async throws -> User
     func signIn(email: String, password: String) async throws -> User
     func signOut() async throws
     func getCurrentUser() -> User?
@@ -46,7 +46,7 @@ class AuthService: AuthServiceProtocol {
     }
     
     // MARK: - Sign Up
-    func signUp(email: String, password: String, firstName: String, lastName: String, phoneNumber: String?, birthDate: Date) async throws -> User {
+    func signUp(email: String, password: String, firstName: String, lastName: String, phoneNumber: String, birthDate: Date) async throws -> User {
         
         // Validation
         guard ValidationUtils.isValidEmail(email) else {
@@ -65,8 +65,12 @@ class AuthService: AuthServiceProtocol {
             throw AuthError.invalidEmail
         }
         
+        guard ValidationUtils.isValidPhoneNumber(phoneNumber) else {
+            throw AuthError.invalidEmail
+        }
+        
         // Check if user already exists
-        if let existingUser = try await userRepository.getUser(by: email) {
+        if let existingUser = try await userRepository.getUserByEmail(email) {
             throw AuthError.userAlreadyExists
         }
         
@@ -100,7 +104,7 @@ class AuthService: AuthServiceProtocol {
         }
         
         // Get user
-        guard let user = try await userRepository.getUser(by: email) else {
+        guard let user = try await userRepository.getUserByEmail(email) else {
             throw AuthError.userNotFound
         }
         

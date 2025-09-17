@@ -1,0 +1,570 @@
+import SwiftUI
+
+struct ContentView: View {
+    @StateObject private var authViewModel = AuthViewModel()
+    
+    var body: some View {
+        Group {
+            if authViewModel.isLoggedIn {
+                DummyMainCalendarView()
+            } else {
+                LoginView()
+                    .environmentObject(authViewModel)
+            }
+        }
+    }
+}
+
+struct MainTabView: View {
+    var body: some View {
+        TabView {
+            Text("Ana Sayfa")
+                .tabItem {
+                    Image(systemName: "house")
+                    Text("Ana Sayfa")
+                }
+            
+            Text("Etkinlikler")
+                .tabItem {
+                    Image(systemName: "calendar")
+                    Text("Etkinlikler")
+                }
+            
+            Text("Kişiler")
+                .tabItem {
+                    Image(systemName: "person.2")
+                    Text("Kişiler")
+                }
+            
+            Text("Profil")
+                .tabItem {
+                    Image(systemName: "person.circle")
+                    Text("Profil")
+                }
+        }
+    }
+}
+
+// MARK: - Dummy Main Calendar View
+struct DummyMainCalendarView: View {
+    @State private var selectedTab = "Today"
+    @State private var currentDayOffset = 0 // 0 = 12.July, 1 = 13.July, etc.
+    @State private var selectedDate: Date? = nil
+    @State private var showingEventDetail = false
+    
+    // Computed properties for dynamic content
+    private var currentDateInfo: (day: String, month: String, weekday: String) {
+        switch currentDayOffset {
+        case 0:
+            return ("12", "July", "Monday")
+        case 1:
+            return ("13", "July", "Tuesday")
+        case 2:
+            return ("14", "July", "Wednesday")
+        default:
+            return ("12", "July", "Monday")
+        }
+    }
+    
+    private var cardGradientColors: [Color] {
+        switch currentDayOffset {
+        case 0:
+            return [Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.8), Color(red: 0.25, green: 0.35, blue: 0.45)]
+        case 1:
+            return [Color.purple.opacity(0.8), Color.purple]
+        case 2:
+            return [Color.green.opacity(0.8), Color.green]
+        default:
+            return [Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.8), Color(red: 0.25, green: 0.35, blue: 0.45)]
+        }
+    }
+    
+    // Mock events for each day
+    private var todaysEvents: [(name: String, emoji: String, time: String)] {
+        switch currentDayOffset {
+        case 0:
+            return [] // No events for 12.July
+        case 1:
+            return [("Alice's Birthday", "🎂", "Today")] // Event for 13.July
+        case 2:
+            return [("Wedding Anniversary", "💍", "Today")] // Event for 14.July
+        default:
+            return []
+        }
+    }
+    
+    private var hasEventsToday: Bool {
+        return !todaysEvents.isEmpty
+    }
+    
+    // Week view properties
+    
+    private var weekDates: [Date] {
+        let calendar = Calendar.current
+        let today = calendar.date(byAdding: .day, value: currentDayOffset, to: Date()) ?? Date()
+        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: today)?.start ?? today
+        
+        return (0..<7).compactMap { dayOffset in
+            calendar.date(byAdding: .day, value: dayOffset, to: startOfWeek)
+        }
+    }
+    
+    private func hasEvent(for date: Date) -> Bool {
+        let calendar = Calendar.current
+        let day = calendar.component(.day, from: date)
+        let month = calendar.component(.month, from: date)
+        
+        // Mock events for specific dates
+        return (day == 13 && month == 7) || (day == 14 && month == 7)
+    }
+    
+    private func getEvent(for date: Date) -> (name: String, emoji: String, time: String)? {
+        let calendar = Calendar.current
+        let day = calendar.component(.day, from: date)
+        let month = calendar.component(.month, from: date)
+        
+        if day == 13 && month == 7 {
+            return ("Alice's Birthday", "🎂", "Today")
+        } else if day == 14 && month == 7 {
+            return ("Wedding Anniversary", "💍", "Today")
+        }
+        return nil
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Calendar")
+                        .font(.system(size: 36, weight: .bold))
+                        .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
+                }
+                
+                Spacer()
+                
+                // Profile Button
+                Button(action: {
+                    // TODO: Profile action
+                }) {
+                    Image(systemName: "person.circle.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
+            
+            // Main Content
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Tab Navigation
+                    HStack {
+                        HStack(spacing: 0) {
+                            ForEach(["Today", "Week", "Month", "Year"], id: \.self) { tab in
+                                Button(action: {
+                                    selectedTab = tab
+                                }) {
+                                    Text(tab)
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(selectedTab == tab ? .white : .secondary)
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 12)
+                                        .background(
+                                            selectedTab == tab ? Color(red: 0.25, green: 0.35, blue: 0.45) : Color.clear
+                                        )
+                                        .cornerRadius(20)
+                                }
+                            }
+                        }
+                        .background(Color(.systemGray6))
+                        .cornerRadius(25)
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
+                    
+                    // Date Header
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("\(currentDateInfo.day).\(currentDateInfo.month)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.primary)
+                            
+                            Text(currentDateInfo.weekday)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
+                    
+                    // Main Content based on selected tab
+                    if selectedTab == "Today" {
+                        // Today Birthdays Card
+                        ZStack {
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(LinearGradient(
+                                gradient: Gradient(colors: cardGradientColors),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ))
+                            .frame(height: 160)
+                        
+                        // Background Icons
+                        HStack {
+                            VStack {
+                                Image(systemName: "calendar")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.white.opacity(0.3))
+                                Spacer()
+                                Image(systemName: "calendar")
+                                    .font(.system(size: 25))
+                                    .foregroundColor(.white.opacity(0.2))
+                            }
+                            
+                            Spacer()
+                            
+                            // Balloons
+                            VStack {
+                                HStack {
+                                    Circle()
+                                        .fill(Color.yellow)
+                                        .frame(width: 20, height: 20)
+                                    Circle()
+                                        .fill(Color.pink)
+                                        .frame(width: 25, height: 25)
+                                    Circle()
+                                        .fill(Color.purple)
+                                        .frame(width: 18, height: 18)
+                                }
+                                .offset(y: -10)
+                                
+                                Spacer()
+                            }
+                            
+                            Spacer()
+                            
+                            VStack {
+                                Image(systemName: "calendar")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(.white.opacity(0.2))
+                                Spacer()
+                                Image(systemName: "calendar")
+                                    .font(.system(size: 35))
+                                    .foregroundColor(.white.opacity(0.25))
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        // Main Content
+                        VStack(spacing: 12) {
+                            Text("Let's Celebrate Today!")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                            
+                            if hasEventsToday {
+                                VStack(spacing: 8) {
+                                    ForEach(Array(todaysEvents.enumerated()), id: \.offset) { _, event in
+                                        HStack(spacing: 12) {
+                                            Text(event.emoji)
+                                                .font(.system(size: 24))
+                                            
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(event.name)
+                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .foregroundColor(.white)
+                                                
+                                                Text(event.time)
+                                                    .font(.system(size: 14, weight: .medium))
+                                                    .foregroundColor(.white.opacity(0.8))
+                                            }
+                                            
+                                            Spacer()
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(Color.white.opacity(0.15))
+                                        .cornerRadius(12)
+                                    }
+                                }
+                                .padding(.horizontal, 20)
+                            } else {
+                                Text("Just another peaceful day 😌")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    
+                    // Today's Celebrations (only show if there are events)
+                    if hasEventsToday {
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Text("Today's Celebrations")
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundColor(.primary)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 20)
+                        
+                            VStack(spacing: 12) {
+                                ForEach(Array(todaysEvents.enumerated()), id: \.offset) { _, event in
+                                    HStack(spacing: 16) {
+                                        // Event Icon
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .fill(Color.blue.opacity(0.2))
+                                                .frame(width: 60, height: 60)
+                                            
+                                            Text(event.emoji)
+                                                .font(.system(size: 30))
+                                        }
+                                        
+                                        // Event Details
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(event.name)
+                                                .font(.system(size: 18, weight: .semibold))
+                                                .foregroundColor(.primary)
+                                            
+                                            HStack(alignment: .bottom, spacing: 4) {
+                                                Text(currentDateInfo.day)
+                                                    .font(.system(size: 32, weight: .bold))
+                                                    .foregroundColor(.primary)
+                                                
+                                                Text(currentDateInfo.month)
+                                                    .font(.system(size: 16, weight: .medium))
+                                                    .foregroundColor(.secondary)
+                                                    .offset(y: -4)
+                                            }
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        // More Button
+                                        Button(action: {
+                                            // TODO: More options
+                                        }) {
+                                            Image(systemName: "ellipsis")
+                                                .font(.system(size: 16, weight: .bold))
+                                                .foregroundColor(.secondary)
+                                                .rotationEffect(.degrees(90))
+                                        }
+                                    }
+                                    .padding(16)
+                                    .background(Color(.systemBackground))
+                                    .cornerRadius(16)
+                                    .padding(.horizontal, 20)
+                                }
+                            }
+                        }
+                    } else if selectedTab == "Week" {
+                        // Week Calendar View (Simplified)
+                        VStack(spacing: 20) {
+                            Text("Week View - Coming Soon!")
+                                .font(.title2)
+                                .foregroundColor(.primary)
+                                .padding()
+                        }
+                    }
+                    
+                    Spacer(minLength: 100) // Tab bar için boşluk
+                }
+            }
+            .gesture(
+                DragGesture()
+                    .onEnded { value in
+                        if value.translation.width < -50 { // Sağa kaydırma
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                currentDayOffset = min(currentDayOffset + 1, 2)
+                            }
+                        } else if value.translation.width > 50 { // Sola kaydırma
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                currentDayOffset = max(currentDayOffset - 1, 0)
+                            }
+                        }
+                    }
+            )
+            
+            Spacer()
+            
+            // Custom Tab Bar
+            HStack {
+                // Home Tab
+                VStack(spacing: 4) {
+                    Image(systemName: "house.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
+                    
+                    Text("Home")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
+                }
+                
+                Spacer()
+                
+                // Add Birthday Tab
+                VStack(spacing: 4) {
+                    Image(systemName: "calendar.badge.plus")
+                        .font(.system(size: 24))
+                        .foregroundColor(.secondary)
+                    
+                    Text("Add birthday")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                // Notifications Tab
+                VStack(spacing: 4) {
+                    ZStack {
+                        Image(systemName: "bell")
+                            .font(.system(size: 24))
+                            .foregroundColor(.secondary)
+                        
+                        // Notification badge
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 8, height: 8)
+                            .offset(x: 8, y: -8)
+                    }
+                    
+                    Text("Notifications")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal, 40)
+            .padding(.vertical, 16)
+            .background(Color(.systemBackground))
+            .overlay(
+                Rectangle()
+                    .fill(Color(.systemGray5))
+                    .frame(height: 0.5),
+                alignment: .top
+            )
+        }
+        .background(Color(.systemGroupedBackground))
+        .sheet(isPresented: $showingEventDetail) {
+            if let selectedDate = selectedDate,
+               let event = getEvent(for: selectedDate) {
+                EventDetailView(event: event, date: selectedDate)
+            }
+        }
+    }
+}
+
+// MARK: - Event Detail View
+struct EventDetailView: View {
+    let event: (name: String, emoji: String, time: String)
+    let date: Date
+    @Environment(\.dismiss) private var dismiss
+    
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d, yyyy"
+        return formatter.string(from: date)
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                // Event Icon
+                ZStack {
+                    Circle()
+                        .fill(Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.2))
+                        .frame(width: 120, height: 120)
+                    
+                    Text(event.emoji)
+                        .font(.system(size: 60))
+                }
+                .padding(.top, 40)
+                
+                // Event Details
+                VStack(spacing: 16) {
+                    Text(event.name)
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.primary)
+                        .multilineTextAlignment(.center)
+                    
+                    Text(formattedDate)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.secondary)
+                    
+                    // Additional event info
+                    VStack(spacing: 12) {
+                        HStack {
+                            Image(systemName: "clock")
+                                .foregroundColor(.secondary)
+                            Text("All Day")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                        
+                        HStack {
+                            Image(systemName: "bell")
+                                .foregroundColor(.secondary)
+                            Text("Reminder set")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+                .padding(.horizontal, 20)
+                
+                Spacer()
+                
+                // Action Buttons
+                VStack(spacing: 12) {
+                    Button(action: {
+                        // TODO: Edit event
+                        dismiss()
+                    }) {
+                        HStack {
+                            Image(systemName: "pencil")
+                            Text("Edit Event")
+                        }
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color(red: 0.25, green: 0.35, blue: 0.45))
+                        .cornerRadius(12)
+                    }
+                    
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Text("Close")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
+            }
+            .navigationTitle("Event Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarItems(trailing: Button("Done") {
+                dismiss()
+            })
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+}
