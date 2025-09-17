@@ -1,5 +1,24 @@
 import SwiftUI
 
+// MARK: - User Event Model
+struct UserEvent: Identifiable, Hashable {
+    let id = UUID()
+    let firstName: String
+    let lastName: String
+    let eventType: String
+    let customName: String?
+    let date: Date
+    let icon: String
+    
+    var displayName: String {
+        if let customName = customName, !customName.isEmpty {
+            return customName
+        } else {
+            return "\(firstName) \(lastName)'s \(eventType)"
+        }
+    }
+}
+
 struct ContentView: View {
     @StateObject private var authViewModel = AuthViewModel()
     
@@ -54,19 +73,122 @@ struct DummyMainCalendarView: View {
     @State private var weekOffset = 0 // 0 = current week, -1 = previous week, 1 = next week
     @State private var monthOffset = 0 // 0 = current month, -1 = previous month, 1 = next month
     @State private var yearOffset = 0 // 0 = current year, -1 = previous year, 1 = next year
+    @State private var showingAddSpecialDay = false
+    @State private var userEvents: [UserEvent] = []
+    
+    init() {
+        // Add some dummy events for 2025 to test the calendar
+        let calendar = Calendar.current
+        var dummyEvents: [UserEvent] = []
+        
+        // Today's event (September 17, 2025)
+        if let todayEvent = calendar.date(from: DateComponents(year: 2025, month: 9, day: 17)) {
+            dummyEvents.append(UserEvent(
+                firstName: "Emma",
+                lastName: "Wilson",
+                eventType: "Birthday",
+                customName: nil,
+                date: todayEvent,
+                icon: "🎂"
+            ))
+        }
+        
+        // Tomorrow's event (September 18, 2025)
+        if let tomorrowEvent = calendar.date(from: DateComponents(year: 2025, month: 9, day: 18)) {
+            dummyEvents.append(UserEvent(
+                firstName: "Michael",
+                lastName: "Johnson",
+                eventType: "Anniversary",
+                customName: nil,
+                date: tomorrowEvent,
+                icon: "💍"
+            ))
+        }
+        
+        // This week's events
+        if let weekEvent1 = calendar.date(from: DateComponents(year: 2025, month: 9, day: 19)) {
+            dummyEvents.append(UserEvent(
+                firstName: "Sarah",
+                lastName: "Davis",
+                eventType: "Custom",
+                customName: "Graduation Party",
+                date: weekEvent1,
+                icon: "🎓"
+            ))
+        }
+        
+        if let weekEvent2 = calendar.date(from: DateComponents(year: 2025, month: 9, day: 21)) {
+            dummyEvents.append(UserEvent(
+                firstName: "Alex",
+                lastName: "Brown",
+                eventType: "Birthday",
+                customName: nil,
+                date: weekEvent2,
+                icon: "🎂"
+            ))
+        }
+        
+        // Next week's event
+        if let nextWeekEvent = calendar.date(from: DateComponents(year: 2025, month: 9, day: 25)) {
+            dummyEvents.append(UserEvent(
+                firstName: "Lisa",
+                lastName: "Anderson",
+                eventType: "Custom",
+                customName: "Concert Night",
+                date: nextWeekEvent,
+                icon: "🎵"
+            ))
+        }
+        
+        // Next month's events (October 2025)
+        if let octoberEvent1 = calendar.date(from: DateComponents(year: 2025, month: 10, day: 5)) {
+            dummyEvents.append(UserEvent(
+                firstName: "David",
+                lastName: "Miller",
+                eventType: "Anniversary",
+                customName: nil,
+                date: octoberEvent1,
+                icon: "💍"
+            ))
+        }
+        
+        if let octoberEvent2 = calendar.date(from: DateComponents(year: 2025, month: 10, day: 15)) {
+            dummyEvents.append(UserEvent(
+                firstName: "Jessica",
+                lastName: "Garcia",
+                eventType: "Custom",
+                customName: "Beach Party",
+                date: octoberEvent2,
+                icon: "🏖️"
+            ))
+        }
+        
+        // December event (for year view testing)
+        if let decemberEvent = calendar.date(from: DateComponents(year: 2025, month: 12, day: 25)) {
+            dummyEvents.append(UserEvent(
+                firstName: "Christmas",
+                lastName: "Day",
+                eventType: "Custom",
+                customName: "Christmas Celebration",
+                date: decemberEvent,
+                icon: "🎄"
+            ))
+        }
+        
+        _userEvents = State(initialValue: dummyEvents)
+    }
     
     // Computed properties for dynamic content
     private var currentDateInfo: (day: String, month: String, weekday: String) {
-        switch currentDayOffset {
-        case 0:
-            return ("12", "July", "Monday")
-        case 1:
-            return ("13", "July", "Tuesday")
-        case 2:
-            return ("14", "July", "Wednesday")
-        default:
-            return ("12", "July", "Monday")
-        }
+        let calendar = Calendar.current
+        let today = Date()
+        let currentDate = calendar.date(byAdding: .day, value: currentDayOffset, to: today) ?? today
+        
+        let day = calendar.component(.day, from: currentDate)
+        let month = calendar.monthSymbols[calendar.component(.month, from: currentDate) - 1]
+        let weekday = calendar.weekdaySymbols[calendar.component(.weekday, from: currentDate) - 1]
+        
+        return ("\(day)", month, weekday)
     }
     
     private var cardGradientColors: [Color] {
@@ -82,18 +204,21 @@ struct DummyMainCalendarView: View {
         }
     }
     
-    // Mock events for each day
+    // Mock events for each day + user events
     private var todaysEvents: [(name: String, emoji: String, time: String)] {
-        switch currentDayOffset {
-        case 0:
-            return [] // No events for 12.July
-        case 1:
-            return [("Alice's Birthday", "🎂", "Today")] // Event for 13.July
-        case 2:
-            return [("Wedding Anniversary", "💍", "Today")] // Event for 14.July
-        default:
-            return []
+        let calendar = Calendar.current
+        let currentDate = calendar.date(byAdding: .day, value: currentDayOffset, to: Date()) ?? Date()
+        
+        // Get user events for current date
+        let userEventsForToday = userEvents.compactMap { event -> (name: String, emoji: String, time: String)? in
+            if calendar.isDate(event.date, inSameDayAs: currentDate) {
+                return (event.displayName, event.icon, "Today")
+            }
+            return nil
         }
+        
+        // Only return user events (no mock events for current dates)
+        return userEventsForToday
     }
     
     private var hasEventsToday: Bool {
@@ -103,56 +228,35 @@ struct DummyMainCalendarView: View {
     // Week view properties
     private var weekDates: [Date] {
         let calendar = Calendar.current
-        
-        // Use July 2024 as base for dummy events (15-21 July 2024)
-        var components = DateComponents()
-        components.year = 2024
-        components.month = 7
-        components.day = 15  // Start from Monday, July 15, 2024
-        
-        let baseStartDate = calendar.date(from: components) ?? Date()
-        
-        // Apply week offset to get different weeks
-        let startDate = calendar.date(byAdding: .weekOfYear, value: weekOffset, to: baseStartDate) ?? baseStartDate
+        let today = Date()
+        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: today)?.start ?? today
+        let targetWeek = calendar.date(byAdding: .weekOfYear, value: weekOffset, to: startOfWeek) ?? startOfWeek
         
         return (0..<7).compactMap { dayOffset in
-            calendar.date(byAdding: .day, value: dayOffset, to: startDate)
+            calendar.date(byAdding: .day, value: dayOffset, to: targetWeek)
         }
     }
     
     private func hasEvent(for date: Date) -> Bool {
         let calendar = Calendar.current
-        let day = calendar.component(.day, from: date)
-        let month = calendar.component(.month, from: date)
         
-        // Mock events for specific dates in July 2024
-        return (day == 13 && month == 7) || 
-               (day == 14 && month == 7) ||
-               (day == 17 && month == 7) ||
-               (day == 19 && month == 7) ||
-               (day == 21 && month == 7)
+        // Check user events
+        return userEvents.contains { event in
+            calendar.isDate(event.date, inSameDayAs: date)
+        }
     }
     
     private func getEvent(for date: Date) -> (name: String, emoji: String, time: String)? {
         let calendar = Calendar.current
-        let day = calendar.component(.day, from: date)
-        let month = calendar.component(.month, from: date)
         
-        // Mock events for July 2024
-        switch (day, month) {
-        case (13, 7):
-            return ("Alice's Birthday", "🎂", "Today")
-        case (14, 7):
-            return ("Wedding Anniversary", "💍", "Today")
-        case (17, 7):
-            return ("Sarah's Graduation", "🎓", "Today")
-        case (19, 7):
-            return ("Beach Party", "🏖️", "Today")
-        case (21, 7):
-            return ("Movie Night", "🎬", "Today")
-        default:
-            return nil
+        // Check user events
+        if let userEvent = userEvents.first(where: { event in
+            calendar.isDate(event.date, inSameDayAs: date)
+        }) {
+            return (userEvent.displayName, userEvent.icon, "Today")
         }
+        
+        return nil
     }
     
     private func getFormattedDate(_ date: Date) -> String {
@@ -168,19 +272,17 @@ struct DummyMainCalendarView: View {
         if let firstDate = weekDates.first {
             return formatter.string(from: firstDate)
         }
-        return "July 2024"
+        
+        let today = Date()
+        return formatter.string(from: today)
     }
     
     // Month view properties
     private var currentMonth: Date {
         let calendar = Calendar.current
-        var components = DateComponents()
-        components.year = 2024
-        components.month = 7  // July 2024 as base
-        components.day = 1
-        
-        let baseDate = calendar.date(from: components) ?? Date()
-        return calendar.date(byAdding: .month, value: monthOffset, to: baseDate) ?? baseDate
+        let today = Date()
+        let startOfMonth = calendar.dateInterval(of: .month, for: today)?.start ?? today
+        return calendar.date(byAdding: .month, value: monthOffset, to: startOfMonth) ?? startOfMonth
     }
     
     private var monthTitle: String {
@@ -222,7 +324,10 @@ struct DummyMainCalendarView: View {
     
     // Year view properties
     private var currentYear: Int {
-        return 2024 + yearOffset
+        let calendar = Calendar.current
+        let today = Date()
+        let baseYear = calendar.component(.year, from: today)
+        return baseYear + yearOffset
     }
     
     private var yearTitle: String {
@@ -241,27 +346,37 @@ struct DummyMainCalendarView: View {
     }
     
     private func hasEventsInMonth(year: Int, month: Int) -> Bool {
-        // Check if any day in this month has events
-        // For now, only July 2024 has events
-        return year == 2024 && month == 7
+        // Check if any user events exist in this month
+        return userEvents.contains { event in
+            let calendar = Calendar.current
+            let eventYear = calendar.component(.year, from: event.date)
+            let eventMonth = calendar.component(.month, from: event.date)
+            return eventYear == year && eventMonth == month
+        }
     }
     
     private func getMiniCalendarDay(week: Int, day: Int, month: Int, year: Int) -> Int {
-        // Realistic mini calendar for July 2024
-        if year == 2024 && month == 7 {
-            // July 2024: 1st = Monday
-            // Real July 2024 calendar positions:
-            // Week 0: 1  2  3  4  5  6  7
-            // Week 1: 8  9 10 11 12 13 14
-            // Week 2: 15 16 17 18 19 20 21
-            // Week 3: 22 23 24 25 26 27 28
-            let dayNumber = week * 7 + day + 1
-            return (dayNumber <= 31) ? dayNumber : 0
-        }
+        // Create a date for the first day of the month
+        let calendar = Calendar.current
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = 1
         
-        // For other months, show a generic pattern
-        let dayNumber = week * 7 + day + 1
-        return (dayNumber <= 30) ? dayNumber : 0
+        guard let firstDayOfMonth = calendar.date(from: components) else { return 0 }
+        
+        // Get the weekday of the first day (1 = Sunday, 2 = Monday, etc.)
+        let firstWeekday = calendar.component(.weekday, from: firstDayOfMonth)
+        let mondayOffset = (firstWeekday + 5) % 7 // Convert to Monday = 0 system
+        
+        // Calculate the day number for this grid position
+        let gridPosition = week * 7 + day
+        let dayNumber = gridPosition - mondayOffset + 1
+        
+        // Get the number of days in this month
+        let daysInMonth = calendar.range(of: .day, in: .month, for: firstDayOfMonth)?.count ?? 30
+        
+        return (dayNumber >= 1 && dayNumber <= daysInMonth) ? dayNumber : 0
     }
     
     private func isDateSelected(_ date: Date) -> Bool {
@@ -1001,7 +1116,9 @@ struct DummyMainCalendarView: View {
                                         Button(action: {
                                             // Navigate to month view with this month
                                             selectedTab = "Month"
-                                            monthOffset = monthInfo.number - 7 // Adjust to July 2024 base
+                                            let calendar = Calendar.current
+                                            let currentMonth = calendar.component(.month, from: Date())
+                                            monthOffset = monthInfo.number - currentMonth
                                         }) {
                                             VStack(spacing: 12) {
                                                 // Month Name
@@ -1103,16 +1220,21 @@ struct DummyMainCalendarView: View {
                 
                 Spacer()
                 
-                // Add Birthday Tab
-                VStack(spacing: 4) {
-                    Image(systemName: "calendar.badge.plus")
-                        .font(.system(size: 24))
-                        .foregroundColor(.secondary)
-                    
-                    Text("Add Special Day")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
+                // Add Special Day Tab
+                Button(action: {
+                    showingAddSpecialDay = true
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "calendar.badge.plus")
+                            .font(.system(size: 24))
+                            .foregroundColor(.secondary)
+                        
+                        Text("Add Special Day")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
                 }
+                .buttonStyle(PlainButtonStyle())
                 
                 Spacer()
                 
@@ -1146,9 +1268,712 @@ struct DummyMainCalendarView: View {
             )
         }
         .background(Color(.systemGroupedBackground))
+        .sheet(isPresented: $showingAddSpecialDay) {
+            AddSpecialDayView(userEvents: $userEvents)
+        }
     }
 }
 
 #Preview {
     ContentView()
+}
+
+// MARK: - Add Special Day View
+struct AddSpecialDayView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var userEvents: [UserEvent]
+    @State private var firstName = ""
+    @State private var lastName = ""
+    @State private var selectedType: EventType? = nil
+    @State private var showingCalendar = false
+    @State private var showingCustomOccasionInput = false
+    @State private var customOccasionName = ""
+    @State private var selectedDate = Date()
+    @State private var showingIconSelector = false
+    @State private var selectedIcon = "🎉"
+    
+    enum EventType: CaseIterable {
+        case birthday
+        case anniversary
+        case custom
+        
+        var title: String {
+            switch self {
+            case .birthday: return "Birthday"
+            case .anniversary: return "Anniversary"
+            case .custom: return "Your Own Occasion"
+            }
+        }
+        
+        var defaultIcon: String {
+            switch self {
+            case .birthday: return "🎂"
+            case .anniversary: return "💍"
+            case .custom: return "🎉"
+            }
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Top Spacing
+                    Spacer()
+                        .frame(height: 60)
+                    
+                    // Fun Header with Animation
+                    VStack(spacing: 20) {
+                        // Fun Icon Animation
+                        HStack(spacing: 8) {
+                            Text("🎉")
+                                .font(.system(size: 28))
+                                .scaleEffect(1.2)
+                                .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: selectedType)
+                            
+                            Text("✨")
+                                .font(.system(size: 24))
+                                .scaleEffect(0.8)
+                                .animation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true), value: selectedType)
+                            
+                            Text("🎊")
+                                .font(.system(size: 26))
+                                .scaleEffect(1.1)
+                                .animation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true), value: selectedType)
+                        }
+                        .padding(.bottom, 8)
+                        
+                        VStack(alignment: .center, spacing: 12) {
+                            Text("Add Special Day")
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundColor(.white)
+                            
+                            Text("Create a new special occasion to remember ✨")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white.opacity(0.8))
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 40)
+                    
+                    // Fun Name Fields Section
+                    VStack(spacing: 24) {
+                        HStack {
+                            Text("👋")
+                                .font(.system(size: 20))
+                            Text("Who are we celebrating?")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        VStack(spacing: 20) {
+                            // First Name with Fun Icon
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack(spacing: 8) {
+                                    Text("🎯")
+                                        .font(.system(size: 16))
+                                    Text("First Name")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(.white)
+                                }
+                                
+                                TextField("Enter first name", text: $firstName)
+                                    .textFieldStyle(FunTextFieldStyle())
+                            }
+                            
+                            // Last Name with Fun Icon
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack(spacing: 8) {
+                                    Text("📝")
+                                        .font(.system(size: 16))
+                                    Text("Last Name")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(.white)
+                                }
+                                
+                                TextField("Enter last name", text: $lastName)
+                                    .textFieldStyle(FunTextFieldStyle())
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    .padding(.bottom, 40)
+                    
+                    // Fun Event Type Selection
+                    VStack(spacing: 24) {
+                        HStack {
+                            Text("🎪")
+                                .font(.system(size: 20))
+                            Text("What kind of celebration?")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        VStack(spacing: 16) {
+                            ForEach(EventType.allCases, id: \.self) { eventType in
+                                FunEventTypeRow(
+                                    eventType: eventType,
+                                    isSelected: selectedType == eventType,
+                                    showingCustomInput: showingCustomOccasionInput && eventType == .custom,
+                                    customOccasionName: $customOccasionName,
+                                    onTap: {
+                                        withAnimation(.spring()) {
+                                            if selectedType == eventType {
+                                                selectedType = nil
+                                                showingCustomOccasionInput = false
+                                            } else {
+                                                selectedType = eventType
+                                                if eventType == .custom {
+                                                    showingCustomOccasionInput = true
+                                                } else {
+                                                    showingCustomOccasionInput = false
+                                                }
+                                            }
+                                        }
+                                    },
+                                    onAddTap: {
+                                        if eventType == .custom && !showingCustomOccasionInput {
+                                            selectedType = eventType
+                                            showingCustomOccasionInput = true
+                                        } else {
+                                            showingCalendar = true
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    
+                    Spacer(minLength: 120)
+                }
+            }
+            .navigationBarHidden(true)
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.8),
+                        Color(red: 0.25, green: 0.35, blue: 0.45)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .sheet(isPresented: $showingCalendar) {
+                CalendarPickerView(
+                    selectedDate: $selectedDate,
+                    onDateSelected: {
+                        showingCalendar = false
+                        if selectedType == .custom {
+                            showingIconSelector = true
+                        } else {
+                            // Save the event directly
+                            saveEvent()
+                        }
+                    }
+                )
+            }
+            .sheet(isPresented: $showingIconSelector) {
+                IconSelectorView(
+                    selectedIcon: $selectedIcon,
+                    onIconSelected: {
+                        showingIconSelector = false
+                        saveEvent()
+                    }
+                )
+            }
+        }
+    }
+    
+    private func saveEvent() {
+        guard let eventType = selectedType else { return }
+        
+        let finalIcon = selectedIcon.isEmpty ? eventType.defaultIcon : selectedIcon
+        let customName = eventType == .custom ? customOccasionName : nil
+        
+        let newEvent = UserEvent(
+            firstName: firstName,
+            lastName: lastName,
+            eventType: eventType.title,
+            customName: customName,
+            date: selectedDate,
+            icon: finalIcon
+        )
+        
+        userEvents.append(newEvent)
+        print("✅ Event saved: \(newEvent.displayName) on \(selectedDate)")
+        dismiss()
+    }
+}
+
+// MARK: - Supporting Views
+struct EventTypeRow: View {
+    let eventType: AddSpecialDayView.EventType
+    let isSelected: Bool
+    let showingCustomInput: Bool
+    @Binding var customOccasionName: String
+    let onTap: () -> Void
+    let onAddTap: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // Main Row
+            HStack(spacing: 16) {
+                // Selection Circle
+                Button(action: onTap) {
+                    Circle()
+                        .stroke(isSelected ? Color(red: 0.25, green: 0.35, blue: 0.45) : Color.gray.opacity(0.3), lineWidth: 2)
+                        .fill(isSelected ? Color(red: 0.25, green: 0.35, blue: 0.45) : Color.clear)
+                        .frame(width: 24, height: 24)
+                        .overlay(
+                            Circle()
+                                .fill(Color.white)
+                                .frame(width: 8, height: 8)
+                                .opacity(isSelected ? 1 : 0)
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Event Type Title
+                Text(eventType.title)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                // Add Button
+                Button(action: onAddTap) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Add")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color(red: 0.25, green: 0.35, blue: 0.45))
+                    .cornerRadius(20)
+                }
+                .disabled(!isSelected)
+                .opacity(isSelected ? 1 : 0.5)
+            }
+            
+            // Custom Occasion Input (only for Your Own Occasion)
+            if showingCustomInput && eventType == .custom {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("What's the special day?")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .padding(.leading, 40) // Align with the title
+                    
+                    TextField("Enter occasion name", text: $customOccasionName)
+                        .textFieldStyle(CustomTextFieldStyle())
+                        .padding(.leading, 40) // Align with the title
+                }
+            }
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(isSelected ? Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.05) : Color(.systemGray6))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isSelected ? Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.3) : Color.clear, lineWidth: 1)
+        )
+    }
+}
+
+struct CustomTextFieldStyle: TextFieldStyle {
+    func _body(configuration: TextField<Self._Label>) -> some View {
+        configuration
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color(.systemGray4), lineWidth: 1)
+            )
+    }
+}
+
+struct FunTextFieldStyle: TextFieldStyle {
+    func _body(configuration: TextField<Self._Label>) -> some View {
+        configuration
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.1), radius: 4, x: 0, y: 2)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.3),
+                                Color(red: 0.35, green: 0.45, blue: 0.65).opacity(0.3)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1.5
+                    )
+            )
+    }
+}
+
+struct FunEventTypeRow: View {
+    let eventType: AddSpecialDayView.EventType
+    let isSelected: Bool
+    let showingCustomInput: Bool
+    @Binding var customOccasionName: String
+    let onTap: () -> Void
+    let onAddTap: () -> Void
+    
+    private var eventIcon: String {
+        switch eventType {
+        case .birthday: return "🎂"
+        case .anniversary: return "💍"
+        case .custom: return "🎨"
+        }
+    }
+    
+    private var eventGradient: LinearGradient {
+        switch eventType {
+        case .birthday:
+            return LinearGradient(
+                colors: [Color.pink.opacity(0.8), Color.orange.opacity(0.8)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .anniversary:
+            return LinearGradient(
+                colors: [Color.red.opacity(0.8), Color.pink.opacity(0.8)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .custom:
+            return LinearGradient(
+                colors: [Color.purple.opacity(0.8), Color.blue.opacity(0.8)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // Main Row
+            HStack(spacing: 16) {
+                // Fun Selection Circle with Animation
+                Button(action: onTap) {
+                    ZStack {
+                        Circle()
+                            .stroke(isSelected ? Color.white : Color.white.opacity(0.4), lineWidth: 3)
+                            .frame(width: 28, height: 28)
+                            .scaleEffect(isSelected ? 1.1 : 1.0)
+                            .animation(.spring(response: 0.3), value: isSelected)
+                        
+                        if isSelected {
+                            Circle()
+                                .fill(Color.white)
+                                .frame(width: 14, height: 14)
+                        }
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Event Icon
+                Text(eventIcon)
+                    .font(.system(size: 24))
+                    .scaleEffect(isSelected ? 1.2 : 1.0)
+                    .animation(.spring(response: 0.3), value: isSelected)
+                
+                // Event Type Title
+                Text(eventType.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                // Fun Add Button
+                Button(action: onAddTap) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 14, weight: .bold))
+                        Text("Add")
+                            .font(.system(size: 16, weight: .semibold))
+                            .fixedSize()
+                    }
+                    .foregroundColor(isSelected ? Color(red: 0.25, green: 0.35, blue: 0.45) : .white.opacity(0.7))
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(isSelected ? Color.white : Color.white.opacity(0.2))
+                    .cornerRadius(25)
+                    .scaleEffect(isSelected ? 1.05 : 0.95)
+                    .animation(.spring(response: 0.3), value: isSelected)
+                }
+                .disabled(!isSelected)
+            }
+            
+            // Custom Occasion Input with Fun Styling
+            if showingCustomInput && eventType == .custom {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Text("✨")
+                            .font(.system(size: 16))
+                        Text("What's the special day?")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white.opacity(0.9))
+                    }
+                    .padding(.leading, 44) // Align with the title
+                    
+                    TextField("Enter occasion name", text: $customOccasionName)
+                        .textFieldStyle(FunTextFieldStyle())
+                        .padding(.leading, 44) // Align with the title
+                }
+                .transition(.opacity.combined(with: .scale))
+            }
+        }
+        .padding(.vertical, 16)
+        .padding(.horizontal, 20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(isSelected ? Color.white.opacity(0.2) : Color.white.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(isSelected ? Color.white.opacity(0.6) : Color.white.opacity(0.3), lineWidth: 2)
+                )
+        )
+        .scaleEffect(isSelected ? 1.02 : 1.0)
+        .animation(.spring(response: 0.3), value: isSelected)
+    }
+}
+
+struct CalendarPickerView: View {
+    @Binding var selectedDate: Date
+    let onDateSelected: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                // Header
+                VStack(spacing: 8) {
+                    Text("Select Date")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
+                    
+                    Text("Choose the date for this special occasion")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.top, 20)
+                
+                // Calendar
+                DatePicker(
+                    "Select Date",
+                    selection: $selectedDate,
+                    displayedComponents: [.date]
+                )
+                .datePickerStyle(.graphical)
+                .padding(.horizontal, 20)
+                
+                // Selected Date Display
+                VStack(spacing: 8) {
+                    Text("Selected Date")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.secondary)
+                    
+                    Text(selectedDate.formatted(date: .complete, time: .omitted))
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.1))
+                        .cornerRadius(12)
+                }
+                .padding(.horizontal, 20)
+                
+                Spacer()
+                
+                // Action Buttons
+                VStack(spacing: 12) {
+                    // Confirm Button
+                    Button(action: onDateSelected) {
+                        HStack {
+                            Image(systemName: "checkmark")
+                            Text("Confirm Date")
+                        }
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color(red: 0.25, green: 0.35, blue: 0.45))
+                        .cornerRadius(12)
+                    }
+                    
+                    // Cancel Button
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Text("Cancel")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
+            }
+            .navigationBarHidden(true)
+        }
+    }
+}
+
+struct IconSelectorView: View {
+    @Binding var selectedIcon: String
+    let onIconSelected: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    
+    private let availableIcons = [
+        // Celebrations
+        "🎉", "🎊", "🎈", "🎁", "🎂", "🍰", "🎀", "✨",
+        // Love & Relationships
+        "❤️", "💕", "💖", "💍", "💒", "👫", "👪", "💐",
+        // Achievements
+        "🏆", "🎖️", "🏅", "🎓", "📜", "⭐", "🌟", "💫",
+        // Travel & Adventure
+        "✈️", "🏖️", "🏔️", "🗺️", "🎒", "📸", "🌍", "🚗",
+        // Work & Career
+        "💼", "👔", "💻", "📊", "🎯", "🚀", "💡", "📈",
+        // Health & Fitness
+        "💪", "🏃", "🧘", "🏋️", "🥇", "🎾", "⚽", "🏀",
+        // Food & Dining
+        "🍕", "🍔", "🍣", "🍷", "☕", "🍪", "🥂", "🍾",
+        // Nature & Animals
+        "🌸", "🌺", "🌻", "🦋", "🐱", "🐶", "🌙", "☀️",
+        // Activities
+        "🎵", "🎸", "🎨", "📚", "🎭", "🎪", "🎳", "🎲"
+    ]
+    
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 6)
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                // Header
+                VStack(spacing: 8) {
+                    Text("Select Icon")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
+                    
+                    Text("Choose an icon that represents your special occasion")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.top, 20)
+                .padding(.horizontal, 20)
+                
+                // Selected Icon Preview
+                VStack(spacing: 12) {
+                    Text("Selected Icon")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.secondary)
+                    
+                    Text(selectedIcon)
+                        .font(.system(size: 48))
+                        .frame(width: 80, height: 80)
+                        .background(Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.1))
+                        .cornerRadius(20)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.3), lineWidth: 2)
+                        )
+                }
+                .padding(.horizontal, 20)
+                
+                // Icon Grid
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(availableIcons, id: \.self) { icon in
+                            Button(action: {
+                                selectedIcon = icon
+                            }) {
+                                Text(icon)
+                                    .font(.system(size: 32))
+                                    .frame(width: 50, height: 50)
+                                    .background(
+                                        selectedIcon == icon 
+                                        ? Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.2)
+                                        : Color(.systemGray6)
+                                    )
+                                    .cornerRadius(12)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(
+                                                selectedIcon == icon 
+                                                ? Color(red: 0.25, green: 0.35, blue: 0.45)
+                                                : Color.clear, 
+                                                lineWidth: 2
+                                            )
+                                    )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+                
+                // Action Buttons
+                VStack(spacing: 12) {
+                    // Confirm Button
+                    Button(action: onIconSelected) {
+                        HStack {
+                            Image(systemName: "checkmark")
+                            Text("Confirm Icon")
+                        }
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color(red: 0.25, green: 0.35, blue: 0.45))
+                        .cornerRadius(12)
+                    }
+                    
+                    // Cancel Button
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Text("Cancel")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
+            }
+            .navigationBarHidden(true)
+        }
+    }
 }
