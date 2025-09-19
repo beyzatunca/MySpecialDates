@@ -25,7 +25,7 @@ struct ContentView: View {
     var body: some View {
         Group {
             if authViewModel.isAuthenticated {
-                DummyMainCalendarView()
+                MainTabView()
             } else {
                 LoginView()
                     .environmentObject(authViewModel)
@@ -37,16 +37,16 @@ struct ContentView: View {
 struct MainTabView: View {
     var body: some View {
         TabView {
-            Text("Ana Sayfa")
-                .tabItem {
-                    Image(systemName: "house")
-                    Text("Ana Sayfa")
-                }
-            
-            Text("Etkinlikler")
+            DummyMainCalendarView()
                 .tabItem {
                     Image(systemName: "calendar")
-                    Text("Etkinlikler")
+                    Text("Doğum Günleri")
+                }
+            
+            Text("Profil")
+                .tabItem {
+                    Image(systemName: "person")
+                    Text("Profil")
                 }
             
             Text("Kişiler")
