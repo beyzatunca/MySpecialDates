@@ -3,8 +3,8 @@ import Combine
 
 protocol UserRepositoryProtocol {
     func saveUser(_ user: User) async throws
-    func getUser(by email: String) async throws -> User?
-    func getUser(by id: String) async throws -> User?
+    func getUserByEmail(_ email: String) async throws -> User?
+    func getUserById(_ id: String) async throws -> User?
     func updateUser(_ user: User) async throws
     func deleteUser(_ user: User) async throws
 }
@@ -21,13 +21,13 @@ class UserRepository: UserRepositoryProtocol {
     }
     
     // MARK: - Get User by Email
-    func getUser(by email: String) async throws -> User? {
+    func getUserByEmail(_ email: String) async throws -> User? {
         let users = getAllUsers()
         return users.values.first { $0.email.lowercased() == email.lowercased() }
     }
     
     // MARK: - Get User by ID
-    func getUser(by id: String) async throws -> User? {
+    func getUserById(_ id: String) async throws -> User? {
         let users = getAllUsers()
         return users[id]
     }

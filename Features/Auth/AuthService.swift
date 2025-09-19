@@ -66,7 +66,7 @@ class AuthService: AuthServiceProtocol {
         }
         
         // Check if user already exists
-        if let existingUser = try await userRepository.getUser(by: email) {
+        if let existingUser = try await userRepository.getUserByEmail(email) {
             throw AuthError.userAlreadyExists
         }
         
@@ -100,7 +100,7 @@ class AuthService: AuthServiceProtocol {
         }
         
         // Get user
-        guard let user = try await userRepository.getUser(by: email) else {
+        guard let user = try await userRepository.getUserByEmail(email) else {
             throw AuthError.userNotFound
         }
         

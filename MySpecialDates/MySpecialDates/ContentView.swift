@@ -24,7 +24,7 @@ struct ContentView: View {
     
     var body: some View {
         Group {
-            if authViewModel.isLoggedIn {
+            if authViewModel.isAuthenticated {
                 DummyMainCalendarView()
             } else {
                 LoginView()
@@ -74,6 +74,7 @@ struct DummyMainCalendarView: View {
     @State private var monthOffset = 0 // 0 = current month, -1 = previous month, 1 = next month
     @State private var yearOffset = 0 // 0 = current year, -1 = previous year, 1 = next year
     @State private var showingAddSpecialDay = false
+    @State private var showingCelebrate = false
     @State private var userEvents: [UserEvent] = []
     
     init() {
@@ -93,8 +94,9 @@ struct DummyMainCalendarView: View {
             ))
         }
         
-        // Tomorrow's event (September 18, 2025)
+        // Tomorrow's events (September 18, 2025) - Multiple events for testing grouping
         if let tomorrowEvent = calendar.date(from: DateComponents(year: 2025, month: 9, day: 18)) {
+            // Anniversary
             dummyEvents.append(UserEvent(
                 firstName: "Michael",
                 lastName: "Johnson",
@@ -102,6 +104,36 @@ struct DummyMainCalendarView: View {
                 customName: nil,
                 date: tomorrowEvent,
                 icon: "💍"
+            ))
+            
+            // Birthday 1
+            dummyEvents.append(UserEvent(
+                firstName: "Anna",
+                lastName: "Smith",
+                eventType: "Birthday",
+                customName: nil,
+                date: tomorrowEvent,
+                icon: "🎂"
+            ))
+            
+            // Birthday 2
+            dummyEvents.append(UserEvent(
+                firstName: "John",
+                lastName: "Doe",
+                eventType: "Birthday",
+                customName: nil,
+                date: tomorrowEvent,
+                icon: "🎂"
+            ))
+            
+            // Custom Event
+            dummyEvents.append(UserEvent(
+                firstName: "Team",
+                lastName: "Meeting",
+                eventType: "Custom",
+                customName: "Project Launch",
+                date: tomorrowEvent,
+                icon: "🚀"
             ))
         }
         
@@ -223,6 +255,46 @@ struct DummyMainCalendarView: View {
     
     private var hasEventsToday: Bool {
         return !todaysEvents.isEmpty
+    }
+    
+    // Group today's events by type
+    private var groupedTodaysEvents: [(type: String, count: Int, icon: String)] {
+        let calendar = Calendar.current
+        let currentDate = calendar.date(byAdding: .day, value: currentDayOffset, to: Date()) ?? Date()
+        
+        // Get user events for current date
+        let userEventsForToday = userEvents.filter { event in
+            calendar.isDate(event.date, inSameDayAs: currentDate)
+        }
+        
+        // Group by event type
+        var eventGroups: [String: (count: Int, icon: String)] = [:]
+        
+        for event in userEventsForToday {
+            if event.eventType == "Birthday" {
+                eventGroups["Birthday"] = (
+                    count: (eventGroups["Birthday"]?.count ?? 0) + 1,
+                    icon: "🎂"
+                )
+            } else if event.eventType == "Anniversary" {
+                eventGroups["Anniversary"] = (
+                    count: (eventGroups["Anniversary"]?.count ?? 0) + 1,
+                    icon: "💍"
+                )
+            } else {
+                // Custom events - use the specific icon
+                let customKey = "Custom"
+                eventGroups[customKey] = (
+                    count: (eventGroups[customKey]?.count ?? 0) + 1,
+                    icon: event.icon
+                )
+            }
+        }
+        
+        // Convert to array and sort
+        return eventGroups.map { (type, data) in
+            (type: type, count: data.count, icon: data.icon)
+        }.sorted { $0.type < $1.type }
     }
     
     // Week view properties
@@ -540,29 +612,38 @@ struct DummyMainCalendarView: View {
                                     .foregroundColor(.white)
                                 
                                 if hasEventsToday {
-                                    VStack(spacing: 8) {
-                                        ForEach(Array(todaysEvents.enumerated()), id: \.offset) { _, event in
-                                            HStack(spacing: 12) {
-                                                Text(event.emoji)
-                                                    .font(.system(size: 24))
-                                                
-                                                VStack(alignment: .leading, spacing: 2) {
-                                                    Text(event.name)
-                                                        .font(.system(size: 16, weight: .semibold))
-                                                        .foregroundColor(.white)
+                                    // Modern circular display with floating emojis - centered
+                                    HStack(spacing: 20) {
+                                        Spacer()
+                                        
+                                        ForEach(Array(groupedTodaysEvents.enumerated()), id: \.offset) { _, group in
+                                            VStack(spacing: 6) {
+                                                // Large emoji with glow effect
+                                                ZStack {
+                                                    Circle()
+                                                        .fill(Color.white.opacity(0.2))
+                                                        .frame(width: 50, height: 50)
+                                                        .blur(radius: 8)
                                                     
-                                                    Text(event.time)
-                                                        .font(.system(size: 14, weight: .medium))
-                                                        .foregroundColor(.white.opacity(0.8))
+                                                    Circle()
+                                                        .fill(Color.white.opacity(0.15))
+                                                        .frame(width: 45, height: 45)
+                                                    
+                                                    Text(group.icon)
+                                                        .font(.system(size: 24))
                                                 }
                                                 
-                                                Spacer()
+                                                // Count badge below
+                                                Text("\(group.count)")
+                                                    .font(.system(size: 12, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                    .frame(width: 20, height: 20)
+                                                    .background(Color.white.opacity(0.3))
+                                                    .cornerRadius(10)
                                             }
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 8)
-                                            .background(Color.white.opacity(0.15))
-                                            .cornerRadius(12)
                                         }
+                                        
+                                        Spacer()
                                     }
                                     .padding(.horizontal, 20)
                                 } else {
@@ -1144,7 +1225,19 @@ struct DummyMainCalendarView: View {
                                                             HStack(spacing: 0) {
                                                                 ForEach(0..<7, id: \.self) { day in
                                                                     let dayNumber = getMiniCalendarDay(week: week, day: day, month: monthInfo.number, year: currentYear)
-                                                                    let hasEventOnDay = monthInfo.hasEvents && (dayNumber == 13 || dayNumber == 14 || dayNumber == 17 || dayNumber == 19 || dayNumber == 21)
+                                                                    let hasEventOnDay: Bool = {
+                                                                        if dayNumber > 0 {
+                                                                            let calendar = Calendar.current
+                                                                            var components = DateComponents()
+                                                                            components.year = currentYear
+                                                                            components.month = monthInfo.number
+                                                                            components.day = dayNumber
+                                                                            if let date = calendar.date(from: components) {
+                                                                                return hasEvent(for: date)
+                                                                            }
+                                                                        }
+                                                                        return false
+                                                                    }()
                                                                     
                                                                     Circle()
                                                                         .fill(dayNumber > 0 ? (hasEventOnDay ? Color(red: 0.25, green: 0.35, blue: 0.45) : Color(.systemGray5)) : Color.clear)
@@ -1206,7 +1299,7 @@ struct DummyMainCalendarView: View {
             Spacer()
             
             // Custom Tab Bar
-            HStack {
+            HStack(spacing: 0) {
                 // Home Tab
                 VStack(spacing: 4) {
                     Image(systemName: "house.fill")
@@ -1217,8 +1310,7 @@ struct DummyMainCalendarView: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
                 }
-                
-                Spacer()
+                .frame(maxWidth: .infinity)
                 
                 // Add Special Day Tab
                 Button(action: {
@@ -1235,27 +1327,24 @@ struct DummyMainCalendarView: View {
                     }
                 }
                 .buttonStyle(PlainButtonStyle())
+                .frame(maxWidth: .infinity)
                 
-                Spacer()
-                
-                // Notifications Tab
-                VStack(spacing: 4) {
-                    ZStack {
-                        Image(systemName: "bell")
+                // Celebrate Tab
+                Button(action: {
+                    showingCelebrate = true
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "party.popper.fill")
                             .font(.system(size: 24))
                             .foregroundColor(.secondary)
                         
-                        // Notification badge
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 8, height: 8)
-                            .offset(x: 8, y: -8)
+                        Text("Celebrate")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.secondary)
                     }
-                    
-                    Text("Notifications")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(PlainButtonStyle())
             }
             .padding(.horizontal, 40)
             .padding(.vertical, 16)
@@ -1267,9 +1356,314 @@ struct DummyMainCalendarView: View {
                 alignment: .top
             )
         }
+        .id(userEvents.count) // Force refresh when user events change
         .background(Color(.systemGroupedBackground))
         .sheet(isPresented: $showingAddSpecialDay) {
             AddSpecialDayView(userEvents: $userEvents)
+        }
+        .sheet(isPresented: $showingCelebrate) {
+            CelebrateView()
+        }
+    }
+}
+
+// MARK: - Celebrate View
+struct CelebrateView: View {
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 32) {
+                    // Top Spacing
+                    Spacer()
+                        .frame(height: 20)
+                    
+                    // Header
+                    VStack(spacing: 12) {
+                        Text("Celebrate")
+                            .font(.system(size: 36, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Text("Craft the perfect birthday wish 🥳")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.horizontal, 20)
+                    
+                    // Celebration Cards Section
+                    VStack(alignment: .leading, spacing: 20) {
+                        HStack {
+                            Text("Celebration Cards")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        LazyVGrid(columns: [
+                            GridItem(.flexible(), spacing: 12),
+                            GridItem(.flexible(), spacing: 12),
+                            GridItem(.flexible(), spacing: 12)
+                        ], spacing: 16) {
+                            // Make a Wish Birthday Cake
+                            VStack(spacing: 12) {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(red: 0.95, green: 0.92, blue: 0.88))
+                                    .frame(height: 120)
+                                    .overlay(
+                                        VStack(spacing: 6) {
+                                            // Birthday cake layers with candles
+                                            VStack(spacing: 2) {
+                                                // Candles
+                                                HStack(spacing: 3) {
+                                                    ForEach(0..<6, id: \.self) { _ in
+                                                        VStack(spacing: 0) {
+                                                            Text("🕯️")
+                                                                .font(.system(size: 8))
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                // Cake layers
+                                                RoundedRectangle(cornerRadius: 4)
+                                                    .fill(Color(red: 0.8, green: 0.3, blue: 0.3))
+                                                    .frame(width: 60, height: 8)
+                                                RoundedRectangle(cornerRadius: 4)
+                                                    .fill(Color(red: 0.95, green: 0.85, blue: 0.8))
+                                                    .frame(width: 65, height: 8)
+                                                RoundedRectangle(cornerRadius: 4)
+                                                    .fill(Color(red: 0.9, green: 0.6, blue: 0.7))
+                                                    .frame(width: 70, height: 8)
+                                                RoundedRectangle(cornerRadius: 4)
+                                                    .fill(Color(red: 0.95, green: 0.85, blue: 0.8))
+                                                    .frame(width: 75, height: 8)
+                                                RoundedRectangle(cornerRadius: 4)
+                                                    .fill(Color(red: 0.9, green: 0.7, blue: 0.4))
+                                                    .frame(width: 80, height: 8)
+                                            }
+                                            
+                                            Text("MAKE A WISH")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(.black)
+                                        }
+                                    )
+                            }
+                            
+                            // Happy Anniversary
+                            VStack(spacing: 12) {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(red: 0.35, green: 0.45, blue: 0.65))
+                                    .frame(height: 120)
+                                    .overlay(
+                                        VStack(spacing: 4) {
+                                            Text("WISHING YOU")
+                                                .font(.system(size: 8, weight: .bold))
+                                                .foregroundColor(.yellow)
+                                            Text("LOTS OF LOVE")
+                                                .font(.system(size: 8, weight: .bold))
+                                                .foregroundColor(.yellow)
+                                            Text("AND HAPPINESS")
+                                                .font(.system(size: 8, weight: .bold))
+                                                .foregroundColor(.yellow)
+                                            
+                                            // Wedding couple on cake with balloons
+                                            VStack(spacing: 2) {
+                                                HStack(spacing: 8) {
+                                                    Text("🎈")
+                                                        .font(.system(size: 10))
+                                                    HStack(spacing: 2) {
+                                                        Text("👰🏻")
+                                                            .font(.system(size: 12))
+                                                        Text("🤵🏻")
+                                                            .font(.system(size: 12))
+                                                    }
+                                                    Text("🎈")
+                                                        .font(.system(size: 10))
+                                                }
+                                                RoundedRectangle(cornerRadius: 6)
+                                                    .fill(Color.white.opacity(0.9))
+                                                    .frame(width: 50, height: 12)
+                                            }
+                                            
+                                            Text("HAPPY")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(.pink)
+                                            Text("ANNIVERSARY")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(.pink)
+                                        }
+                                    )
+                            }
+                            
+                            // Maria's 24th Birthday (Cocktail Theme)
+                            VStack(spacing: 12) {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(red: 0.9, green: 0.9, blue: 0.92))
+                                    .frame(height: 120)
+                                    .overlay(
+                                        VStack(spacing: 4) {
+                                            // Disco balls
+                                            HStack(spacing: 8) {
+                                                Text("🪩")
+                                                    .font(.system(size: 16))
+                                                Text("🪩")
+                                                    .font(.system(size: 12))
+                                            }
+                                            .offset(x: 15, y: -5)
+                                            
+                                            Text("Maria's 24th")
+                                                .font(.system(size: 11, weight: .bold, design: .serif))
+                                                .foregroundColor(.black)
+                                                .italic()
+                                            Text("birthday")
+                                                .font(.system(size: 11, weight: .bold, design: .serif))
+                                                .foregroundColor(.black)
+                                                .italic()
+                                            
+                                            // Cocktail glass with grapefruit
+                                            VStack(spacing: 0) {
+                                                Text("🍸")
+                                                    .font(.system(size: 20))
+                                                Text("🍊")
+                                                    .font(.system(size: 8))
+                                                    .offset(x: -8, y: -5)
+                                            }
+                                        }
+                                    )
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    
+                    // AI Message Generator Section
+                    VStack(alignment: .leading, spacing: 20) {
+                        HStack {
+                            Text("AI Message Generator")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        Button(action: {
+                            // TODO: AI Message Generator action
+                        }) {
+                            HStack(spacing: 16) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundColor(.white)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Get a")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(.white)
+                                    Text("Personalized Message")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(.white)
+                                }
+                                
+                                Spacer()
+                            }
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 20)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.blue, Color.purple],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(16)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .padding(.horizontal, 20)
+                    }
+                    
+                    // Birthday GIFs Section
+                    VStack(alignment: .leading, spacing: 20) {
+                        HStack {
+                            Text("Birthday GIFs")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        LazyVGrid(columns: [
+                            GridItem(.flexible(), spacing: 12),
+                            GridItem(.flexible(), spacing: 12),
+                            GridItem(.flexible(), spacing: 12)
+                        ], spacing: 16) {
+                            // Happy Birthday GIF (Dark)
+                            VStack(spacing: 12) {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(red: 0.15, green: 0.15, blue: 0.25))
+                                    .frame(height: 120)
+                                    .overlay(
+                                        VStack(spacing: 8) {
+                                            Text("✨ ⭐ ✨")
+                                                .font(.system(size: 16))
+                                            Text("HAPPY")
+                                                .font(.system(size: 16, weight: .bold))
+                                                .foregroundColor(.white)
+                                            Text("BIRTHDAY")
+                                                .font(.system(size: 12, weight: .bold))
+                                                .foregroundColor(.white)
+                                            Text("✨ ⭐ ✨")
+                                                .font(.system(size: 16))
+                                        }
+                                    )
+                            }
+                            
+                            // Balloons (Pink)
+                            VStack(spacing: 12) {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(red: 0.9, green: 0.7, blue: 0.7))
+                                    .frame(height: 120)
+                                    .overlay(
+                                        VStack(spacing: 8) {
+                                            Text("🎈🎈")
+                                                .font(.system(size: 32))
+                                            Text("😊 😊")
+                                                .font(.system(size: 24))
+                                        }
+                                    )
+                            }
+                            
+                            // Party Hat (Light Blue)
+                            VStack(spacing: 12) {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(red: 0.7, green: 0.85, blue: 0.95))
+                                    .frame(height: 120)
+                                    .overlay(
+                                        VStack(spacing: 8) {
+                                            Text("🎉")
+                                                .font(.system(size: 32))
+                                            Text("🎊 🎈")
+                                                .font(.system(size: 24))
+                                        }
+                                    )
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    
+                    Spacer(minLength: 100)
+                }
+            }
+            .navigationBarHidden(true)
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.9),
+                        Color(red: 0.25, green: 0.35, blue: 0.45)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
         }
     }
 }
