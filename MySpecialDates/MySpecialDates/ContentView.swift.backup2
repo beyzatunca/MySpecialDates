@@ -21,35 +21,42 @@ struct UserEvent: Identifiable, Hashable {
 
 struct ContentView: View {
     @StateObject private var authViewModel = AuthViewModel()
+    @State private var showingContactPermission = false
     @State private var contactSyncViewModel: ContactSyncViewModel?
-    @StateObject private var calendarSyncViewModel = CalendarSyncViewModel()
-    @State private var showingCalendarPermission = false
     
     var body: some View {
         Group {
             if authViewModel.isAuthenticated {
-                DummyMainCalendarView(
-                    contactSyncViewModel: $contactSyncViewModel,
-                    calendarSyncViewModel: calendarSyncViewModel
-                )
+                DummyMainCalendarView(contactSyncViewModel: $contactSyncViewModel)
+                    .onAppear {
+                        // Show contact permission popup when user first logs in
+                        if contactSyncViewModel == nil {
+                            showingContactPermission = true
+                        }
+                    }
+                    .sheet(isPresented: $showingContactPermission) {
+                        ContactPermissionView(
+                            isPresented: $showingContactPermission,
+                            onPermissionGranted: {
+                                // Initialize ContactSyncViewModel and start sync
+                                contactSyncViewModel = ContactSyncViewModel()
+                                Task {
+                                    await contactSyncViewModel?.startContactSync()
+                                }
+                            },
+                            onPermissionDenied: {
+                                // User denied permission, initialize empty ContactSyncViewModel
+                                contactSyncViewModel = ContactSyncViewModel()
+                            }
+                        )
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
+                        .presentationBackground(.clear)
+                    }
             } else {
                 LoginView()
                     .environmentObject(authViewModel)
             }
-        }
-        .onChange(of: authViewModel.isAuthenticated) { isAuthenticated in
-            if isAuthenticated {
-                // Giriş yapıldıktan sonra Apple Takvim izni pop-up'ı göster
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    showingCalendarPermission = true
-                }
-            }
-        }
-        .sheet(isPresented: $showingCalendarPermission) {
-            CalendarPermissionView(calendarSyncViewModel: calendarSyncViewModel)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(.ultraThinMaterial)
         }
     }
 }
@@ -68,11 +75,10 @@ struct DummyMainCalendarView: View {
     @State private var showingCelebrate = false
     @State private var userEvents: [UserEvent] = []
     @Binding var contactSyncViewModel: ContactSyncViewModel?
-    let calendarSyncViewModel: CalendarSyncViewModel
     
-    init(contactSyncViewModel: Binding<ContactSyncViewModel?>, calendarSyncViewModel: CalendarSyncViewModel) {
+    init(contactSyncViewModel: Binding<ContactSyncViewModel?>) {
         self._contactSyncViewModel = contactSyncViewModel
-        self.calendarSyncViewModel = calendarSyncViewModel
+        
         // Add some dummy events for 2025 to test the calendar
         let calendar = Calendar.current
         var dummyEvents: [UserEvent] = []
@@ -510,7 +516,7 @@ struct DummyMainCalendarView: View {
                     // Tab Selection
                     HStack {
                         HStack(spacing: 0) {
-                            ForEach(["Today", "Month"], id: \.self) { tab in
+                            ForEach(["Today", "Week", "Month", "Year"], id: \.self) { tab in
                                 Button(action: {
                                     selectedTab = tab
                                 }) {
@@ -534,8 +540,7 @@ struct DummyMainCalendarView: View {
                     .padding(.horizontal, 20)
                     
                     // Main Content based on selected tab
-            if selectedTab == "Today" {
-                        
+                    if selectedTab == "Today" {
                         // Date Header
                         HStack {
                             VStack(alignment: .leading) {
@@ -735,13 +740,13 @@ struct DummyMainCalendarView: View {
                                                     .fill(Color.purple.opacity(0.2))
                                                     .frame(width: 60, height: 60)
                                                 
-                                                Text(event.icon)
+                                                Text(event.emoji)
                                                     .font(.system(size: 30))
                                             }
                                             
                                             // Event Details
                                             VStack(alignment: .leading, spacing: 4) {
-                                                Text(event.displayName)
+                                                Text(event.name)
                                                     .font(.system(size: 18, weight: .semibold))
                                                     .foregroundColor(.primary)
                                                 
@@ -795,216 +800,6 @@ struct DummyMainCalendarView: View {
                         }
                         .padding(.top, 20)
                         
-                    } else if selectedTab == "Week" {
-                        // Modern Week Calendar View
-                        VStack(spacing: 24) {
-                            // Month/Year Header with Navigation
-                            HStack {
-                                // Previous Week Button
-                                Button(action: {
-                                    withAnimation(.easeInOut(duration: 0.3)) {
-                                        weekOffset -= 1
-                                        selectedDate = nil
-                                        showingEventDetail = false
-                                    }
-                                }) {
-                                    Image(systemName: "chevron.left")
-                                        .font(.system(size: 20, weight: .semibold))
-                                        .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
-                                        .frame(width: 40, height: 40)
-                                        .background(Color(.systemGray6))
-                                        .clipShape(Circle())
-                                }
-                                
-                                Spacer()
-                                
-                                // Week Title
-                                Text(weekTitle)
-                                    .font(.system(size: 24, weight: .bold))
-                                    .foregroundColor(.primary)
-                                
-                                Spacer()
-                                
-                                // Next Week Button
-                                Button(action: {
-                                    withAnimation(.easeInOut(duration: 0.3)) {
-                                        weekOffset += 1
-                                        selectedDate = nil
-                                        showingEventDetail = false
-                                    }
-                                }) {
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 20, weight: .semibold))
-                                        .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
-                                        .frame(width: 40, height: 40)
-                                        .background(Color(.systemGray6))
-                                        .clipShape(Circle())
-                                }
-                            }
-                            .padding(.horizontal, 20)
-                            
-                            // Week Calendar Card
-                            VStack(spacing: 0) {
-                                // Week days header (abbreviated)
-                                HStack(spacing: 0) {
-                                    ForEach(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], id: \.self) { day in
-                                        Text(day)
-                                            .font(.system(size: 12, weight: .medium))
-                                            .foregroundColor(.secondary)
-                                            .frame(maxWidth: .infinity)
-                                    }
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.top, 16)
-                                
-                                // Week dates
-                                HStack(spacing: 0) {
-                                    ForEach(Array(weekDates.enumerated()), id: \.offset) { index, date in
-                                        let calendar = Calendar.current
-                                        let day = calendar.component(.day, from: date)
-                                        let hasEventForDate = hasEvent(for: date)
-                                        
-                                        Button(action: {
-                                            selectedDate = date
-                                            showingEventDetail = true
-                                        }) {
-                                            VStack(spacing: 8) {
-                                                // Date number
-                                                Text("\(day)")
-                                                    .font(.system(size: 20, weight: .bold))
-                                                    .foregroundColor(getDateTextColor(date: date, hasEvent: hasEventForDate))
-                                                
-                                                // Event indicator
-                                                Circle()
-                                                    .fill(getIndicatorColor(date: date, hasEvent: hasEventForDate))
-                                                    .frame(width: 6, height: 6)
-                                            }
-                                            .frame(maxWidth: .infinity)
-                                            .frame(height: 60)
-                                            .background(getDateBackgroundColor(date: date, hasEvent: hasEventForDate))
-                                            .cornerRadius(12)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                    }
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 16)
-                            }
-                            .background(Color(.systemBackground))
-                            .cornerRadius(16)
-                            .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
-                            .padding(.horizontal, 20)
-                            
-                            // Selected Date Content
-                            if let selectedDate = selectedDate, showingEventDetail {
-                                if let event = getEvent(for: selectedDate) {
-                                    // Event Card - Modern Design
-                                    VStack(alignment: .leading, spacing: 16) {
-                                        HStack {
-                                            Text("Today's Celebrations")
-                                                .font(.system(size: 20, weight: .bold))
-                                                .foregroundColor(.primary)
-                                            Spacer()
-                                            
-                                            Button(action: {
-                                                showingEventDetail = false
-                                                self.selectedDate = nil
-                                            }) {
-                                                Image(systemName: "xmark.circle.fill")
-                                                    .font(.system(size: 20))
-                                                    .foregroundColor(.secondary)
-                                            }
-                                        }
-                                        .padding(.horizontal, 20)
-                                        
-                                        // Event Card
-                                        HStack(spacing: 16) {
-                                            // Large Event Icon
-                                            ZStack {
-                                                RoundedRectangle(cornerRadius: 20)
-                                                    .fill(Color.blue.opacity(0.15))
-                                                    .frame(width: 80, height: 80)
-                                                
-                                                Text(event.emoji)
-                                                    .font(.system(size: 40))
-                                            }
-                                            
-                                            // Event Details
-                                            VStack(alignment: .leading, spacing: 6) {
-                                                Text(event.name)
-                                                    .font(.system(size: 20, weight: .bold))
-                                                    .foregroundColor(.primary)
-                                                
-                                                let calendar = Calendar.current
-                                                let day = calendar.component(.day, from: selectedDate)
-                                                let monthName = calendar.monthSymbols[calendar.component(.month, from: selectedDate) - 1]
-                                                
-                                                HStack(alignment: .bottom, spacing: 6) {
-                                                    Text("\(day)")
-                                                        .font(.system(size: 36, weight: .bold))
-                                                        .foregroundColor(.primary)
-                                                    
-                                                    Text(monthName)
-                                                        .font(.system(size: 18, weight: .medium))
-                                                        .foregroundColor(.secondary)
-                                                        .offset(y: -6)
-                                                }
-                                            }
-                                            
-                                            Spacer()
-                                            
-                                            // More Button
-                                            Button(action: {
-                                                // TODO: More options
-                                            }) {
-                                                Image(systemName: "ellipsis")
-                                                    .font(.system(size: 18, weight: .bold))
-                                                    .foregroundColor(.secondary)
-                                                    .rotationEffect(.degrees(90))
-                                            }
-                                        }
-                                        .padding(.horizontal, 20)
-                                        .padding(.vertical, 20)
-                                        .background(Color(.systemBackground))
-                                        .cornerRadius(16)
-                                        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-                                        .padding(.horizontal, 20)
-                                    }
-                                } else {
-                                    // No event card
-                                    VStack(spacing: 16) {
-                                        HStack {
-                                            Text("Selected Day")
-                                                .font(.system(size: 20, weight: .bold))
-                                                .foregroundColor(.primary)
-                                            Spacer()
-                                            
-                                            Button(action: {
-                                                showingEventDetail = false
-                                                self.selectedDate = nil
-                                            }) {
-                                                Image(systemName: "xmark.circle.fill")
-                                                    .font(.system(size: 20))
-                                                    .foregroundColor(.secondary)
-                                            }
-                                        }
-                                        .padding(.horizontal, 20)
-                                        
-                                        VStack(spacing: 12) {
-                                            Text("A quiet day today ☕️")
-                                                .font(.system(size: 16, weight: .medium))
-                                                .foregroundColor(.secondary)
-                                                .multilineTextAlignment(.center)
-                                        }
-                                        .padding(.horizontal, 20)
-                                        .padding(.vertical, 30)
-                                        .background(Color(.systemGray6))
-                                        .cornerRadius(12)
-                                        .padding(.horizontal, 20)
-                                    }
-                                }
-                            }
-                        }
                     } else if selectedTab == "Month" {
                         // Month Calendar View
                         VStack(spacing: 24) {
@@ -1220,161 +1015,74 @@ struct DummyMainCalendarView: View {
                                 }
                             }
                         }
-                    } else if selectedTab == "Year" {
-                        // Year View
-                        VStack(spacing: 24) {
-                            // Year Header with Navigation
+                        
+                        // Month Birthdays Section
+                        VStack(alignment: .leading, spacing: 16) {
                             HStack {
-                                // Previous Year Button
-                                Button(action: {
-                                    withAnimation(.easeInOut(duration: 0.3)) {
-                                        yearOffset -= 1
-                                        selectedDate = nil
-                                        showingEventDetail = false
-                                    }
-                                }) {
-                                    Image(systemName: "chevron.left")
-                                        .font(.system(size: 20, weight: .semibold))
-                                        .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
-                                        .frame(width: 40, height: 40)
-                                        .background(Color(.systemGray6))
-                                        .clipShape(Circle())
-                                }
-                                
-                                Spacer()
-                                
-                                // Year Title
-                                Text(yearTitle)
-                                    .font(.system(size: 24, weight: .bold))
+                                Text("Bu Ayki Doğum Günleri")
+                                    .font(.system(size: 20, weight: .bold))
                                     .foregroundColor(.primary)
-                                
                                 Spacer()
-                                
-                                // Next Year Button
-                                Button(action: {
-                                    withAnimation(.easeInOut(duration: 0.3)) {
-                                        yearOffset += 1
-                                        selectedDate = nil
-                                        showingEventDetail = false
-                                    }
-                                }) {
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 20, weight: .semibold))
-                                        .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
-                                        .frame(width: 40, height: 40)
-                                        .background(Color(.systemGray6))
-                                        .clipShape(Circle())
-                                }
                             }
                             .padding(.horizontal, 20)
                             
-                            // Year Calendar Grid (3x4 months)
-                            VStack(spacing: 0) {
-                                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 16) {
-                                    ForEach(Array(yearMonths.enumerated()), id: \.offset) { index, monthInfo in
-                                        Button(action: {
-                                            // Navigate to month view with this month
-                                            selectedTab = "Month"
-                                            let calendar = Calendar.current
-                                            let currentMonth = calendar.component(.month, from: Date())
-                                            monthOffset = monthInfo.number - currentMonth
-                                        }) {
-                                            VStack(spacing: 12) {
-                                                // Month Name
-                                                Text(monthInfo.month)
-                                                    .font(.system(size: 18, weight: .semibold))
-                                                    .foregroundColor(.primary)
-                                                
-                                                // Mini Calendar Representation
-                                                VStack(spacing: 4) {
-                                                    // Week header
-                                                    HStack(spacing: 0) {
-                                                        ForEach(["M", "T", "W", "T", "F", "S", "S"], id: \.self) { day in
-                                                            Text(day)
-                                                                .font(.system(size: 8, weight: .medium))
-                                                                .foregroundColor(.secondary)
-                                                                .frame(width: 10, height: 10)
-                                                        }
-                                                    }
-                                                    
-                                                    // Mini calendar grid (simplified and fixed)
-                                                    VStack(spacing: 1) {
-                                                        ForEach(0..<4, id: \.self) { week in
-                                                            HStack(spacing: 0) {
-                                                                ForEach(0..<7, id: \.self) { day in
-                                                                    let dayNumber = getMiniCalendarDay(week: week, day: day, month: monthInfo.number, year: currentYear)
-                                                                    let hasEventOnDay: Bool = {
-                                                                        if dayNumber > 0 {
-                                                                            let calendar = Calendar.current
-                                                                            var components = DateComponents()
-                                                                            components.year = currentYear
-                                                                            components.month = monthInfo.number
-                                                                            components.day = dayNumber
-                                                                            if let date = calendar.date(from: components) {
-                                                                                return hasEvent(for: date)
-                                                                            }
-                                                                        }
-                                                                        return false
-                                                                    }()
-                                                                    
-                                                                    Circle()
-                                                                        .fill(dayNumber > 0 ? (hasEventOnDay ? Color(red: 0.25, green: 0.35, blue: 0.45) : Color(.systemGray5)) : Color.clear)
-                                                                        .frame(width: 6, height: 6)
-                                                                        .frame(width: 10, height: 6) // Container frame for alignment
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                                
-                                                // Event indicator
-                                                if monthInfo.hasEvents {
-                                                    Circle()
-                                                        .fill(Color(red: 0.25, green: 0.35, blue: 0.45))
-                                                        .frame(width: 6, height: 6)
-                                                } else {
-                                                    Circle()
-                                                        .fill(Color.clear)
-                                                        .frame(width: 6, height: 6)
-                                                }
+                            let monthBirthdays = getBirthdaysForMonth()
+                            if !monthBirthdays.isEmpty {
+                                ForEach(monthBirthdays) { birthday in
+                                    HStack(spacing: 12) {
+                                        Circle()
+                                            .fill(Color.green.opacity(0.2))
+                                            .frame(width: 44, height: 44)
+                                            .overlay {
+                                                Text(String(birthday.contactName.prefix(1)).uppercased())
+                                                    .font(.headline)
+                                                    .fontWeight(.semibold)
+                                                    .foregroundColor(.green)
                                             }
-                                            .frame(width: 100, height: 120)
-                                            .padding(12)
-                                            .background(Color(.systemBackground))
-                                            .cornerRadius(12)
-                                            .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+                                        
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(birthday.contactName)
+                                                .font(.headline)
+                                                .fontWeight(.medium)
+                                            
+                                            Text(birthday.type.displayName)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
                                         }
-                                        .buttonStyle(PlainButtonStyle())
+                                        
+                                        Spacer()
+                                        
+                                        VStack(alignment: .trailing, spacing: 4) {
+                                            Text("\(birthday.daysUntilBirthday) gün")
+                                                .font(.caption)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.green)
+                                            
+                                            Text("\(birthday.age + 1) yaş")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
                                     }
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 8)
+                                    .background(Color(.systemBackground))
+                                    .cornerRadius(12)
+                                    .padding(.horizontal, 20)
                                 }
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 16)
-                            }
-                            .background(Color(.systemGroupedBackground))
-                            .cornerRadius(16)
-                            .padding(.horizontal, 20)
-                        }
-                    }
-                    
-                    Spacer(minLength: 100) // Tab bar için boşluk
-                }
-            }
-            .gesture(
-                DragGesture()
-                    .onEnded { value in
-                        if value.translation.width < -50 { // Sağa kaydırma
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                currentDayOffset = min(currentDayOffset + 1, 2)
-                            }
-                        } else if value.translation.width > 50 { // Sola kaydırma
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                currentDayOffset = max(currentDayOffset - 1, 0)
+                            } else {
+                                Text("Bu ay doğum günü yok")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.secondary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 20)
+                                    .background(Color(.systemGray6))
+                                    .cornerRadius(12)
+                                    .padding(.horizontal, 20)
                             }
                         }
+                        .padding(.top, 20)
                     }
-            )
             
-            Spacer()
             
             // Custom Tab Bar
             HStack(spacing: 0) {
@@ -1442,6 +1150,99 @@ struct DummyMainCalendarView: View {
         .sheet(isPresented: $showingCelebrate) {
             CelebrateView()
         }
+    }
+    
+    // MARK: - Birthday Filtering Functions
+    
+    /// Gets birthdays for the current week (7 days from today)
+    private func getBirthdaysForWeek() -> [BirthdayDisplayModel] {
+        let today = Date()
+        let calendar = Calendar.current
+        let weekFromNow = calendar.date(byAdding: .day, value: 7, to: today) ?? today
+        
+        return contactSyncViewModel?.birthdays.filter { birthday in
+            let birthdayThisYear = calendar.date(from: DateComponents(
+                year: calendar.component(.year, from: today),
+                month: calendar.component(.month, from: birthday.birthday),
+                day: calendar.component(.day, from: birthday.birthday)
+            )) ?? birthday.birthday
+            
+            return birthdayThisYear >= today && birthdayThisYear <= weekFromNow
+        }.sorted { $0.daysUntilBirthday < $1.daysUntilBirthday } ?? []
+    }
+    
+    /// Gets birthdays for the current month
+    private func getBirthdaysForMonth() -> [BirthdayDisplayModel] {
+        let today = Date()
+        let calendar = Calendar.current
+        let currentMonth = calendar.component(.month, from: today)
+        
+        return contactSyncViewModel?.birthdays.filter { birthday in
+            calendar.component(.month, from: birthday.birthday) == currentMonth
+        }.sorted { $0.daysUntilBirthday < $1.daysUntilBirthday } ?? []
+    }
+    
+    /// Gets birthdays for the current year
+    private func getBirthdaysForYear() -> [BirthdayDisplayModel] {
+        let today = Date()
+        let calendar = Calendar.current
+        let currentYear = calendar.component(.year, from: today)
+        
+        return contactSyncViewModel?.birthdays.filter { birthday in
+            calendar.component(.year, from: birthday.birthday) == currentYear
+        }.sorted { $0.daysUntilBirthday < $1.daysUntilBirthday } ?? []
+    }
+    
+    /// Gets events for the current week (7 days from today)
+    private func getWeeklyEvents() -> [UserEvent] {
+        let today = Date()
+        let calendar = Calendar.current
+        let weekFromNow = calendar.date(byAdding: .day, value: 7, to: today) ?? today
+        
+        return userEvents.filter { event in
+            let eventThisYear = calendar.date(from: DateComponents(
+                year: calendar.component(.year, from: today),
+                month: calendar.component(.month, from: event.date),
+                day: calendar.component(.day, from: event.date)
+            )) ?? event.date
+            
+            return eventThisYear >= today && eventThisYear <= weekFromNow
+        }.sorted { $0.date < $1.date }
+    }
+}
+
+// MARK: - Stat Card Component
+struct StatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(color)
+                
+                Spacer()
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(value)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.primary)
+                
+                Text(title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
 }
 
@@ -2448,195 +2249,4 @@ struct IconSelectorView: View {
             .navigationBarHidden(true)
         }
     }
-}
-
-// MARK: - DummyMainCalendarView Extension
-extension DummyMainCalendarView {
-    /// Gets events for the current week (7 days from today)
-    private func getWeeklyEvents() -> [UserEvent] {
-        let today = Date()
-        let calendar = Calendar.current
-        let weekFromNow = calendar.date(byAdding: .day, value: 7, to: today) ?? today
-        
-        return userEvents.filter { event in
-            let eventThisYear = calendar.date(from: DateComponents(
-                year: calendar.component(.year, from: today),
-                month: calendar.component(.month, from: event.date),
-                day: calendar.component(.day, from: event.date)
-            )) ?? event.date
-            
-            return eventThisYear >= today && eventThisYear <= weekFromNow
-        }.sorted { $0.date < $1.date }
-    }
-}
-
-
-// MARK: - Calendar Permission View
-struct CalendarPermissionView: View {
-    let calendarSyncViewModel: CalendarSyncViewModel
-    @Environment(\.dismiss) private var dismiss
-    @State private var animateIcon = false
-    @State private var animateContent = false
-    
-    var body: some View {
-        ZStack {
-            // Modern blur background
-            Color.clear
-                .background(.ultraThinMaterial)
-                .ignoresSafeArea()
-            
-            // Main content container
-            VStack(spacing: 0) {
-                // Top spacer
-                Spacer()
-                
-                // Content card
-                VStack(spacing: 32) {
-                    // Animated icon with gradient background
-                    ZStack {
-                        // Gradient background circle
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.green.opacity(0.2), .blue.opacity(0.1)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 100, height: 100)
-                            .scaleEffect(animateIcon ? 1.0 : 0.8)
-                            .opacity(animateIcon ? 1.0 : 0.6)
-                        
-                        // Main icon
-                        Image(systemName: "calendar.badge.plus")
-                            .font(.system(size: 50, weight: .medium))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.green, .blue],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .scaleEffect(animateIcon ? 1.0 : 0.9)
-                    }
-                    .onAppear {
-                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                            animateIcon = true
-                        }
-                    }
-                    
-                    // Text content
-                    VStack(spacing: 16) {
-                        // Title
-                        Text("Apple Takvim Erişimi")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundColor(.primary)
-                            .opacity(animateContent ? 1.0 : 0.0)
-                            .offset(y: animateContent ? 0 : 20)
-                        
-                        // Description
-                        Text("Apple Takviminizdeki doğum günlerini otomatik olarak senkronize etmek için takvim erişim izni verin. Bu sayede hiçbir önemli günü kaçırmazsınız.")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .lineSpacing(4)
-                            .opacity(animateContent ? 1.0 : 0.0)
-                            .offset(y: animateContent ? 0 : 20)
-                    }
-                    .onAppear {
-                        withAnimation(.spring(response: 0.8, dampingFraction: 0.9).delay(0.2)) {
-                            animateContent = true
-                        }
-                    }
-                    
-                    // Action buttons
-                    VStack(spacing: 12) {
-                        // Primary button - Allow
-                        Button(action: {
-                            Task {
-                                await calendarSyncViewModel.requestCalendarPermission()
-                            }
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                dismiss()
-                            }
-                        }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 16, weight: .semibold))
-                                
-                                Text("İzin Ver")
-                                    .font(.system(size: 17, weight: .semibold))
-                            }
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 56)
-                            .background(
-                                LinearGradient(
-                                    colors: [.green, .blue],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .shadow(color: .green.opacity(0.3), radius: 8, x: 0, y: 4)
-                        }
-                        .scaleEffect(animateContent ? 1.0 : 0.95)
-                        .opacity(animateContent ? 1.0 : 0.0)
-                        
-                        // Secondary button - Not now
-                        Button(action: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                dismiss()
-                            }
-                        }) {
-                            Text("Şimdi Değil")
-                                .font(.system(size: 17, weight: .medium))
-                                .foregroundColor(.secondary)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 56)
-                                .background(Color(.systemGray6))
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
-                        }
-                        .scaleEffect(animateContent ? 1.0 : 0.95)
-                        .opacity(animateContent ? 1.0 : 0.0)
-                    }
-                    .onAppear {
-                        withAnimation(.spring(response: 0.8, dampingFraction: 0.9).delay(0.4)) {
-                            animateContent = true
-                        }
-                    }
-                }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 32)
-                .background(
-                    RoundedRectangle(cornerRadius: 24)
-                        .fill(.regularMaterial)
-                        .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 10)
-                )
-                .padding(.horizontal, 20)
-                
-                // Bottom spacer
-                Spacer()
-            }
-        }
-        .onAppear {
-            // Start animations
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                animateIcon = true
-            }
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.9).delay(0.2)) {
-                animateContent = true
-            }
-        }
-    }
-}
-
-// MARK: - DateFormatter Extensions
-extension DateFormatter {
-    static let shortDate: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .none
-        return formatter
-    }()
 }

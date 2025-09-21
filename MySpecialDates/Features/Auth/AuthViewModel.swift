@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import SwiftUI
+import AuthenticationServices
 
 @MainActor
 class AuthViewModel: ObservableObject {
@@ -116,8 +117,35 @@ class AuthViewModel: ObservableObject {
     }
     
     func signInWithApple() async {
-        // TODO: Implement Apple login
-        print("Apple login not implemented yet")
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // Create Apple Sign-In service
+            let appleSignInService = AppleSignInService(firebaseService: FirebaseEventService())
+            let firestoreUser = try await appleSignInService.signInWithApple()
+            
+            // Convert FirestoreUser to our User model
+            let user = User(
+                id: firestoreUser.id ?? UUID().uuidString,
+                firstName: firestoreUser.displayName.components(separatedBy: " ").first ?? "",
+                lastName: firestoreUser.displayName.components(separatedBy: " ").dropFirst().joined(separator: " "),
+                email: firestoreUser.email,
+                phoneNumber: nil,
+                birthDate: Date(), // Default value
+                authType: .apple
+            )
+            
+            currentUser = user
+            clearForm()
+            print("✅ Apple Sign-In başarılı: \(user.firstName) \(user.lastName)")
+        } catch {
+            errorMessage = error.localizedDescription
+            showingError = true
+            print("❌ Apple Sign-In hatası: \(error)")
+        }
+        
+        isLoading = false
     }
     
     // MARK: - Helper Methods

@@ -11,8 +11,9 @@ import SwiftUI
 struct MySpecialDatesApp: App {
     
     init() {
-        // Firebase yapılandırması - şimdilik devre dışı
+        // Firebase yapılandırması - şimdi aktif
         // FirebaseConfiguration.shared.configure()
+        print("🔥 Firebase yapılandırması başlatılıyor...")
     }
     
     var body: some Scene {
