@@ -39,87 +39,170 @@ struct AddSpecialDayView: View {
             case .custom: return "🎉"
             }
         }
+        
+        var icon: String {
+            switch self {
+            case .birthday: return "birthday.cake.fill"
+            case .anniversary: return "heart.fill"
+            case .custom: return "sparkles"
+            }
+        }
+        
+        var color: Color {
+            switch self {
+            case .birthday: return Color(red: 1.0, green: 0.6, blue: 0.7)
+            case .anniversary: return Color(red: 0.9, green: 0.4, blue: 0.6)
+            case .custom: return Color(red: 0.4, green: 0.6, blue: 0.9)
+            }
+        }
     }
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Header
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Add Special Day")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
-                        
-                        Text("Create a new special occasion to remember")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 20)
-                    
-                    // Name Fields
-                    VStack(spacing: 16) {
-                        // First Name
+            ZStack {
+                // Background Gradient
+                LinearGradient(
+                    colors: [
+                        Color(.systemBackground),
+                        Color(.systemGray6).opacity(0.3)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Header Section
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("First Name")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.primary)
+                            Text("Add Special Day")
+                                .font(.system(size: 34, weight: .bold, design: .rounded))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.2, green: 0.3, blue: 0.5),
+                                            Color(red: 0.3, green: 0.4, blue: 0.6)
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
                             
-                            TextField("Enter first name", text: $firstName)
-                                .textFieldStyle(CustomTextFieldStyle())
+                            Text("Create a beautiful memory")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.secondary)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 8)
+                        .padding(.bottom, 32)
                         
-                        // Last Name
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Last Name")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.primary)
+                        // Name Section
+                        VStack(spacing: 16) {
+                            // First Name
+                            VStack(alignment: .leading, spacing: 10) {
+                                Label("First Name", systemImage: "person.fill")
+                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                    .foregroundColor(.secondary)
+                                    .textCase(.uppercase)
+                                    .tracking(0.5)
+                                
+                                TextField("", text: $firstName, prompt: Text("Enter first name").foregroundColor(.secondary.opacity(0.6)))
+                                    .font(.system(size: 17, weight: .regular))
+                                    .foregroundColor(.primary)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 16)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(Color(.systemBackground))
+                                            .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
+                                    )
+                            }
                             
-                            TextField("Enter last name", text: $lastName)
-                                .textFieldStyle(CustomTextFieldStyle())
+                            // Last Name
+                            VStack(alignment: .leading, spacing: 10) {
+                                Label("Last Name", systemImage: "person.fill")
+                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                    .foregroundColor(.secondary)
+                                    .textCase(.uppercase)
+                                    .tracking(0.5)
+                                
+                                TextField("", text: $lastName, prompt: Text("Enter last name").foregroundColor(.secondary.opacity(0.6)))
+                                    .font(.system(size: 17, weight: .regular))
+                                    .foregroundColor(.primary)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 16)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(Color(.systemBackground))
+                                            .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
+                                    )
+                            }
                         }
-                    }
-                    .padding(.horizontal, 20)
-                    
-                    // Event Type Selection
-                    VStack(spacing: 20) {
-                        ForEach(EventType.allCases, id: \.self) { eventType in
-                            EventTypeRow(
-                                eventType: eventType,
-                                isSelected: selectedType == eventType,
-                                showingCustomInput: showingCustomOccasionInput && eventType == .custom,
-                                customOccasionName: $customOccasionName,
-                                onTap: {
-                                    if selectedType == eventType {
-                                        selectedType = nil
-                                        showingCustomOccasionInput = false
-                                    } else {
-                                        selectedType = eventType
-                                        if eventType == .custom {
-                                            showingCustomOccasionInput = true
-                                        } else {
-                                            showingCustomOccasionInput = false
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 32)
+                        
+                        // Event Type Section
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Event Type")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .foregroundColor(.secondary)
+                                .textCase(.uppercase)
+                                .tracking(0.5)
+                                .padding(.horizontal, 24)
+                            
+                            VStack(spacing: 12) {
+                                ForEach(EventType.allCases, id: \.self) { eventType in
+                                    EventTypeCard(
+                                        eventType: eventType,
+                                        isSelected: selectedType == eventType,
+                                        showingCustomInput: showingCustomOccasionInput && eventType == .custom,
+                                        customOccasionName: $customOccasionName,
+                                        onTap: {
+                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                                if selectedType == eventType {
+                                                    selectedType = nil
+                                                    showingCustomOccasionInput = false
+                                                } else {
+                                                    selectedType = eventType
+                                                    if eventType == .custom {
+                                                        showingCustomOccasionInput = true
+                                                    } else {
+                                                        showingCustomOccasionInput = false
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        onAddTap: {
+                                            if eventType == .custom && !showingCustomOccasionInput {
+                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                                    selectedType = eventType
+                                                    showingCustomOccasionInput = true
+                                                }
+                                            } else {
+                                                showingCalendar = true
+                                            }
                                         }
-                                    }
-                                },
-                                onAddTap: {
-                                    if eventType == .custom && !showingCustomOccasionInput {
-                                        selectedType = eventType
-                                        showingCustomOccasionInput = true
-                                    } else {
-                                        showingCalendar = true
-                                    }
+                                    )
                                 }
-                            )
+                            }
+                            .padding(.horizontal, 24)
                         }
+                        .padding(.bottom, 40)
                     }
-                    .padding(.horizontal, 20)
-                    
-                    Spacer(minLength: 100)
                 }
             }
             .navigationBarHidden(true)
+            .overlay(alignment: .topTrailing) {
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.secondary.opacity(0.6))
+                        .background(Circle().fill(.ultraThinMaterial))
+                        .padding(.top, 8)
+                        .padding(.trailing, 20)
+                }
+            }
             .sheet(isPresented: $showingCalendar) {
                 CalendarPickerView(
                     selectedDate: $selectedDate,
@@ -128,7 +211,6 @@ struct AddSpecialDayView: View {
                         if selectedType == .custom {
                             showingIconSelector = true
                         } else {
-                            // Save the event directly
                             saveEvent()
                         }
                     }
@@ -153,7 +235,7 @@ struct AddSpecialDayView: View {
     }
 }
 
-struct EventTypeRow: View {
+struct EventTypeCard: View {
     let eventType: AddSpecialDayView.EventType
     let isSelected: Bool
     let showingCustomInput: Bool
@@ -162,87 +244,148 @@ struct EventTypeRow: View {
     let onAddTap: () -> Void
     
     var body: some View {
-        VStack(spacing: 12) {
-            // Main Row
+        VStack(spacing: 0) {
+            // Main Card
             HStack(spacing: 16) {
-                // Selection Circle
-                Button(action: onTap) {
+                // Icon Container
+                ZStack {
                     Circle()
-                        .stroke(isSelected ? Color(red: 0.25, green: 0.35, blue: 0.45) : Color.gray.opacity(0.3), lineWidth: 2)
-                        .fill(isSelected ? Color(red: 0.25, green: 0.35, blue: 0.45) : Color.clear)
-                        .frame(width: 24, height: 24)
-                        .overlay(
-                            Circle()
-                                .fill(Color.white)
-                                .frame(width: 8, height: 8)
-                                .opacity(isSelected ? 1 : 0)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    eventType.color.opacity(0.2),
+                                    eventType.color.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 56, height: 56)
+                    
+                    Image(systemName: eventType.icon)
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    eventType.color,
+                                    eventType.color.opacity(0.7)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
                 }
-                .buttonStyle(PlainButtonStyle())
                 
-                // Event Type Title
-                Text(eventType.title)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.primary)
+                // Title
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(eventType.title)
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundColor(.primary)
+                    
+                    if eventType == .custom && !showingCustomInput {
+                        Text("Create your custom occasion")
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundColor(.secondary)
+                    }
+                }
                 
                 Spacer()
                 
-                // Add Button
-                Button(action: onAddTap) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 14, weight: .semibold))
-                        Text("Add")
-                            .font(.system(size: 16, weight: .semibold))
+                // Selection Indicator
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? eventType.color : Color(.systemGray5))
+                        .frame(width: 24, height: 24)
+                    
+                    if isSelected {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
                     }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Color(red: 0.25, green: 0.35, blue: 0.45))
-                    .cornerRadius(20)
                 }
-                .disabled(!isSelected)
-                .opacity(isSelected ? 1 : 0.5)
+                .animation(.spring(response: 0.2), value: isSelected)
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color(.systemBackground))
+                    .shadow(
+                        color: isSelected ? eventType.color.opacity(0.2) : .black.opacity(0.04),
+                        radius: isSelected ? 12 : 8,
+                        x: 0,
+                        y: isSelected ? 4 : 2
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        isSelected ? eventType.color.opacity(0.4) : Color.clear,
+                        lineWidth: 2
+                    )
+            )
+            .onTapGesture {
+                onTap()
             }
             
-            // Custom Occasion Input (only for Your Own Occasion)
+            // Custom Input Field
             if showingCustomInput && eventType == .custom {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("What's the special day?")
-                        .font(.system(size: 14, weight: .medium))
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Occasion Name")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundColor(.secondary)
-                        .padding(.leading, 40) // Align with the title
+                        .textCase(.uppercase)
+                        .tracking(0.5)
+                        .padding(.top, 16)
+                        .padding(.horizontal, 20)
                     
-                    TextField("Enter occasion name", text: $customOccasionName)
-                        .textFieldStyle(CustomTextFieldStyle())
-                        .padding(.leading, 40) // Align with the title
+                    TextField("", text: $customOccasionName, prompt: Text("Enter occasion name").foregroundColor(.secondary.opacity(0.6)))
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                        .padding(.bottom, 4)
+                        .padding(.horizontal, 20)
                 }
             }
+            
+            // Add Button
+            if isSelected {
+                Button(action: onAddTap) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "calendar.badge.plus")
+                            .font(.system(size: 16, weight: .semibold))
+                        Text("Select Date")
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                eventType.color,
+                                eventType.color.opacity(0.8)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(16)
+                    .shadow(
+                        color: eventType.color.opacity(0.4),
+                        radius: 12,
+                        x: 0,
+                        y: 4
+                    )
+                }
+                .padding(.top, 16)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 4)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(isSelected ? Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.05) : Color(.systemGray6))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(isSelected ? Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.3) : Color.clear, lineWidth: 1)
-        )
-    }
-}
-
-struct CustomTextFieldStyle: TextFieldStyle {
-    func _body(configuration: TextField<Self._Label>) -> some View {
-        configuration
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color(.systemBackground))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color(.systemGray4), lineWidth: 1)
-            )
+        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isSelected)
+        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: showingCustomInput)
     }
 }
 
