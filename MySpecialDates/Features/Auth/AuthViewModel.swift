@@ -23,6 +23,7 @@ class AuthViewModel: ObservableObject {
     @Published var showingError = false
     @Published var rememberMe = false
     @Published var isLoggedIn = false
+    @Published var signUpSuccessful = false
     
     private let authService: AuthServiceProtocol
     private var cancellables = Set<AnyCancellable>()
@@ -79,8 +80,12 @@ class AuthViewModel: ObservableObject {
     func signUp() async {
         isLoading = true
         errorMessage = nil
+        signUpSuccessful = false
         
         do {
+            // Email'i kaydet (Login ekranına aktarmak için)
+            let savedEmail = email
+            
             let user = try await authService.signUp(
                 email: email,
                 password: password,
@@ -90,10 +95,20 @@ class AuthViewModel: ObservableObject {
                 birthDate: birthDate
             )
             currentUser = user
-            clearForm()
+            
+            // Formu temizle ama email'i koru (Login ekranında gösterilmek için)
+            password = ""
+            firstName = ""
+            lastName = ""
+            phoneNumber = ""
+            birthDate = Date()
+            email = savedEmail // Email'i geri yükle
+            
+            signUpSuccessful = true
         } catch {
             errorMessage = error.localizedDescription
             showingError = true
+            signUpSuccessful = false
         }
         
         isLoading = false

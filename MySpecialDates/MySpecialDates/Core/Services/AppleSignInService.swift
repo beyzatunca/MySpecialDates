@@ -4,6 +4,7 @@ import AuthenticationServices
 import CryptoKit
 
 // MARK: - Apple Sign-In Service Protocol
+@MainActor
 protocol AppleSignInServiceProtocol {
     func signInWithApple() async throws -> FirestoreUser
     func signOut() async throws
@@ -239,7 +240,22 @@ extension AppleSignInService: ASAuthorizationControllerDelegate {
 // MARK: - ASAuthorizationControllerPresentationContextProviding
 extension AppleSignInService: ASAuthorizationControllerPresentationContextProviding {
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        return UIApplication.shared.windows.first { $0.isKeyWindow } ?? ASPresentationAnchor()
+        if #available(iOS 15.0, *) {
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
+                return window
+            }
+        } else {
+            if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) {
+                return window
+            }
+        }
+        // Fallback: Return a default anchor
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            return window
+        }
+        return ASPresentationAnchor()
     }
 }
 

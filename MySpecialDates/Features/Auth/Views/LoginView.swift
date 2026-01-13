@@ -536,14 +536,14 @@ struct DummyForgotPasswordFlow: View {
                         .cornerRadius(12)
                         .keyboardType(.numberPad)
                         .focused($focusedField, equals: index)
-                        .onChange(of: verificationCode[index]) { newValue in
+                        .onChange(of: verificationCode[index]) { old, new in
                             // Move to next field when digit is entered
-                            if newValue.count == 1 && index < 5 {
+                            if new.count == 1 && index < 5 {
                                 focusedField = index + 1
                             }
                             // Limit to 1 character
-                            if newValue.count > 1 {
-                                verificationCode[index] = String(newValue.suffix(1))
+                            if new.count > 1 {
+                                verificationCode[index] = String(new.suffix(1))
                             }
                         }
                 }

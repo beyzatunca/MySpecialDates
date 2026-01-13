@@ -229,7 +229,7 @@ struct IconSelectorView: View {
 }
 
 #Preview {
-    IconSelectorView(selectedIcon: .constant("🎉")) {
+    IconSelectorView(selectedIcon: .constant("🎉"), onIconSelected: {
         print("Icon selected")
-    }
+    })
 }

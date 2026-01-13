@@ -1,4 +1,5 @@
 import SwiftUI
+import EventKit
 
 // MARK: - User Event Model
 struct UserEvent: Identifiable, Hashable {
@@ -14,7 +15,12 @@ struct UserEvent: Identifiable, Hashable {
         if let customName = customName, !customName.isEmpty {
             return customName
         } else {
-            return "\(firstName) \(lastName)'s \(eventType)"
+            let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
+            if fullName.isEmpty {
+                return eventType
+            } else {
+                return "\(fullName)'s \(eventType)"
+            }
         }
     }
 }
@@ -37,19 +43,52 @@ struct ContentView: View {
                     .environmentObject(authViewModel)
             }
         }
-        .onChange(of: authViewModel.isAuthenticated) { isAuthenticated in
-            if isAuthenticated {
-                // Giriş yapıldıktan sonra Apple Takvim izni pop-up'ı göster
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    showingCalendarPermission = true
+        .onChange(of: authViewModel.isAuthenticated) { old, new in
+            if new {
+                // Giriş yapıldıktan sonra Apple Takvim izni durumunu kontrol et
+                Task {
+                    // İzin durumunu kontrol et
+                    let currentStatus = EKEventStore.authorizationStatus(for: .event)
+                    
+                    // Eğer izin daha önce verilmediyse ve kullanıcı daha önce reddetmediyse pop-up göster
+                    var hasPermission = false
+                    if #available(iOS 17.0, *) {
+                        hasPermission = (currentStatus == .fullAccess)
+                    } else {
+                        hasPermission = (currentStatus == .authorized)
+                    }
+                    
+                    if !hasPermission && currentStatus == .notDetermined {
+                        // UserDefaults'da izin verilip verilmediğini kontrol et
+                        let hasShownPermission = UserDefaults.standard.bool(forKey: "hasShownCalendarPermission")
+                        if !hasShownPermission {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                showingCalendarPermission = true
+                            }
+                        }
+                    }
                 }
+            }
+        }
+        .onChange(of: calendarSyncViewModel.calendarPermissionStatus) { old, new in
+            // İzin verildiğinde pop-up'ı kapat ve bir daha gösterme
+            let currentStatus = EKEventStore.authorizationStatus(for: .event)
+            var hasPermission = false
+            if #available(iOS 17.0, *) {
+                hasPermission = (currentStatus == .fullAccess)
+            } else {
+                hasPermission = (currentStatus == .authorized)
+            }
+            
+            if hasPermission {
+                showingCalendarPermission = false
+                UserDefaults.standard.set(true, forKey: "hasShownCalendarPermission")
             }
         }
         .sheet(isPresented: $showingCalendarPermission) {
             CalendarPermissionView(calendarSyncViewModel: calendarSyncViewModel)
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
-                .presentationBackground(.ultraThinMaterial)
         }
     }
 }
@@ -67,6 +106,12 @@ struct DummyMainCalendarView: View {
     @State private var showingAddSpecialDay = false
     @State private var showingCelebrate = false
     @State private var userEvents: [UserEvent] = []
+    @State private var selectedEventForMenu: UserEvent? = nil
+    @State private var showingAIMessage = false
+    @State private var showingGiftCards = false
+    @State private var showingPlaces = false
+    @State private var showingCharity = false
+    @State private var showingEventMenu = false
     @Binding var contactSyncViewModel: ContactSyncViewModel?
     let calendarSyncViewModel: CalendarSyncViewModel
     
@@ -246,6 +291,13 @@ struct DummyMainCalendarView: View {
         
         // Only return user events (no mock events for current dates)
         return userEventsForToday
+    }
+    
+    // Get UserEvent objects for today
+    private var todaysUserEvents: [UserEvent] {
+        let calendar = Calendar.current
+        let currentDate = calendar.date(byAdding: .day, value: currentDayOffset, to: Date()) ?? Date()
+        return userEvents.filter { calendar.isDate($0.date, inSameDayAs: currentDate) }
     }
     
     private var hasEventsToday: Bool {
@@ -480,32 +532,469 @@ struct DummyMainCalendarView: View {
         }
     }
     
-    var body: some View {
-        VStack(spacing: 0) {
-            // Header
+    // MARK: - Today Tab Content
+    private var todayTabContent: some View {
+        VStack(spacing: 20) {
+            // Date Header
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Calendar")
-                        .font(.system(size: 36, weight: .bold))
-                        .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
+                VStack(alignment: .leading) {
+                    Text("\(currentDateInfo.day).\(currentDateInfo.month)")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.primary)
+                    
+                    Text(currentDateInfo.weekday)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            
+            // Today Birthdays Card
+            todayBirthdaysCard
+            
+            // Today's Celebrations
+            if hasEventsToday {
+                todaysCelebrationsSection
+            }
+            
+            // Don't Miss These Moments
+            dontMissSection
+        }
+    }
+    
+    private var todayBirthdaysCard: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(LinearGradient(
+                    gradient: Gradient(colors: cardGradientColors),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+                .frame(height: 160)
+            
+            // Background Icons
+            HStack {
+                VStack {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 30))
+                        .foregroundColor(.white.opacity(0.3))
+                    Spacer()
+                    Image(systemName: "calendar")
+                        .font(.system(size: 25))
+                        .foregroundColor(.white.opacity(0.2))
                 }
                 
                 Spacer()
                 
-                // Profile Button
-                Button(action: {
-                    // TODO: Profile action
-                }) {
-                    Image(systemName: "person.circle.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
+                // Balloons
+                VStack {
+                    HStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.4))
+                            .frame(width: 12, height: 12)
+                        Circle()
+                            .fill(Color.white.opacity(0.3))
+                            .frame(width: 8, height: 8)
+                    }
+                    Spacer()
+                    HStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.2))
+                            .frame(width: 10, height: 10)
+                        Circle()
+                            .fill(Color.white.opacity(0.25))
+                            .frame(width: 6, height: 6)
+                    }
                 }
+                .padding(.trailing, 20)
+                .padding(.top, 20)
             }
             .padding(.horizontal, 20)
-            .padding(.top, 10)
             
             // Main Content
-            ScrollView {
+            VStack(spacing: 12) {
+                Text("Let's Celebrate Today!")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.white)
+                
+                if hasEventsToday {
+                    // Modern circular display with floating emojis - centered
+                    HStack(spacing: 20) {
+                        Spacer()
+                        
+                        ForEach(Array(groupedTodaysEvents.enumerated()), id: \.offset) { _, group in
+                            VStack(spacing: 6) {
+                                // Large emoji with glow effect
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.2))
+                                        .frame(width: 50, height: 50)
+                                        .blur(radius: 8)
+                                    
+                                    Circle()
+                                        .fill(Color.white.opacity(0.15))
+                                        .frame(width: 45, height: 45)
+                                    
+                                    Text(group.icon)
+                                        .font(.system(size: 24))
+                                }
+                                
+                                // Count badge below
+                                Text("\(group.count)")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 20, height: 20)
+                                    .background(Color.white.opacity(0.3))
+                                    .cornerRadius(10)
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
+                } else {
+                    Text("A quiet day today ☕️")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    private var todaysCelebrationsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Today's Celebrations")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.primary)
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+        
+            VStack(spacing: 12) {
+                ForEach(Array(todaysUserEvents.enumerated()), id: \.element.id) { index, event in
+                    let eventDisplay = todaysEvents[index]
+                    HStack(spacing: 16) {
+                        // Event Icon
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.blue.opacity(0.2))
+                                .frame(width: 60, height: 60)
+                            
+                            Text(eventDisplay.emoji)
+                                .font(.system(size: 30))
+                        }
+                        
+                        // Event Details
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(eventDisplay.name)
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.primary)
+                            
+                            HStack(alignment: .bottom, spacing: 4) {
+                                Text(currentDateInfo.day)
+                                    .font(.system(size: 32, weight: .bold))
+                                    .foregroundColor(.primary)
+                                
+                                Text(currentDateInfo.month)
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.secondary)
+                                    .offset(y: -4)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        // More Button with Menu
+                        Menu {
+                            Button(action: {
+                                selectedEventForMenu = event
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    showingAIMessage = true
+                                }
+                            }) {
+                                Label("Create message with AI", systemImage: "sparkles")
+                            }
+                            
+                            Button(action: {
+                                selectedEventForMenu = event
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    showingGiftCards = true
+                                }
+                            }) {
+                                Label("Send gift card", systemImage: "gift")
+                            }
+                            
+                            Button(action: {
+                                selectedEventForMenu = event
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    showingPlaces = true
+                                }
+                            }) {
+                                Label("Find a place to celebrate", systemImage: "mappin.circle")
+                            }
+                            
+                            Button(action: {
+                                selectedEventForMenu = event
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    showingCharity = true
+                                }
+                            }) {
+                                Label("Do charity", systemImage: "heart.circle")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.secondary)
+                                .rotationEffect(.degrees(90))
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                    }
+                    .padding(16)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(16)
+                    .padding(.horizontal, 20)
+                }
+            }
+        }
+    }
+    
+    private var dontMissSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Don't Miss These Moments")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.primary)
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            
+            let weeklyEvents = getWeeklyEvents()
+            if !weeklyEvents.isEmpty {
+                VStack(spacing: 12) {
+                    ForEach(weeklyEvents) { event in
+                        HStack(spacing: 16) {
+                            // Event Icon
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color.purple.opacity(0.2))
+                                    .frame(width: 60, height: 60)
+                                
+                                Text(event.icon)
+                                    .font(.system(size: 30))
+                            }
+                            
+                            // Event Details
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(event.displayName)
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundColor(.primary)
+                                
+                                HStack(alignment: .bottom, spacing: 4) {
+                                    let calendar = Calendar.current
+                                    let day = calendar.component(.day, from: event.date)
+                                    let monthName = calendar.monthSymbols[calendar.component(.month, from: event.date) - 1]
+                                    
+                                    Text("\(day)")
+                                        .font(.system(size: 32, weight: .bold))
+                                        .foregroundColor(.primary)
+                                    
+                                    Text(monthName)
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                        .offset(y: -4)
+                                }
+                            }
+                            
+                            Spacer()
+                            
+                            // More Button
+                            Button(action: {
+                                // TODO: More options
+                            }) {
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(.secondary)
+                                    .rotationEffect(.degrees(90))
+                            }
+                        }
+                        .padding(16)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(16)
+                        .padding(.horizontal, 20)
+                    }
+                }
+            } else {
+                VStack(spacing: 12) {
+                    Text("Bu hafta özel bir etkinlik yok")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+                .padding(.horizontal, 20)
+            }
+        }
+        .padding(.top, 20)
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Fixed Header - Scroll edildiğinde sabit kalır
+            headerView
+                .background(Color(.systemGroupedBackground))
+                .zIndex(1)
+            
+            // Scrollable Content
+            mainContentView
+            
+            // Fixed Tab Bar - Scroll edildiğinde sabit kalır
+            tabBarView
+                .background(Color(.systemBackground))
+                .zIndex(1)
+        }
+        .id(userEvents.count) // Force refresh when user events change
+        .background(Color(.systemGroupedBackground))
+        .sheet(isPresented: $showingAddSpecialDay) {
+            AddSpecialDayView(userEvents: $userEvents)
+        }
+        .sheet(isPresented: $showingCelebrate) {
+            CelebrateTabView()
+        }
+        .sheet(isPresented: $showingAIMessage) {
+            if let event = selectedEventForMenu {
+                CreateAIMessageView(event: event)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+        .onChange(of: showingAIMessage) { oldValue, newValue in
+            if !newValue {
+                // Sheet kapandığında event'i temizle
+                selectedEventForMenu = nil
+            }
+        }
+        .sheet(isPresented: $showingGiftCards) {
+            if let event = selectedEventForMenu {
+                GiftCardsView(event: event)
+            } else {
+                EmptyView()
+            }
+        }
+        .sheet(isPresented: $showingPlaces) {
+            if let event = selectedEventForMenu {
+                FindPlaceView(event: event)
+            } else {
+                EmptyView()
+            }
+        }
+        .sheet(isPresented: $showingCharity) {
+            if let event = selectedEventForMenu {
+                CharityView(event: event)
+            } else {
+                EmptyView()
+            }
+        }
+    }
+    
+    private var headerView: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Calendar")
+                    .font(.system(size: 36, weight: .bold))
+                    .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
+            }
+            
+            Spacer()
+            
+            // Profile Button
+            Button(action: {
+                // TODO: Profile action
+            }) {
+                Image(systemName: "person.circle.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .padding(.bottom, 10)
+        .background(
+            Color(.systemGroupedBackground)
+                .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+        )
+    }
+    
+    private var tabBarView: some View {
+        HStack(spacing: 0) {
+            // Home Tab
+            VStack(spacing: 4) {
+                Image(systemName: "house.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
+                
+                Text("Home")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
+            }
+            .frame(maxWidth: .infinity)
+            
+            // Add Special Day Tab
+            Button(action: {
+                showingAddSpecialDay = true
+            }) {
+                VStack(spacing: 4) {
+                    Image(systemName: "calendar.badge.plus")
+                        .font(.system(size: 24))
+                        .foregroundColor(.secondary)
+                    
+                    Text("Add Special Day")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
+            .frame(maxWidth: .infinity)
+            
+            // Celebrate Tab
+            Button(action: {
+                showingCelebrate = true
+            }) {
+                VStack(spacing: 4) {
+                    Image(systemName: "party.popper.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.secondary)
+                    
+                    Text("Celebrate")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .padding(.horizontal, 40)
+        .padding(.vertical, 16)
+        .padding(.bottom, 8) // Safe area için
+        .background(Color(.systemBackground))
+        .overlay(
+            Rectangle()
+                .fill(Color(.systemGray5))
+                .frame(height: 0.5),
+            alignment: .top
+        )
+        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: -2)
+    }
+    
+    private var mainContentView: some View {
+        ScrollView {
                 VStack(spacing: 20) {
                     // Tab Selection
                     HStack {
@@ -534,268 +1023,10 @@ struct DummyMainCalendarView: View {
                     .padding(.horizontal, 20)
                     
                     // Main Content based on selected tab
-            if selectedTab == "Today" {
-                        
-                        // Date Header
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text("\(currentDateInfo.day).\(currentDateInfo.month)")
-                                    .font(.system(size: 24, weight: .bold))
-                                    .foregroundColor(.primary)
-                                
-                                Text(currentDateInfo.weekday)
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                        }
-                        .padding(.horizontal, 20)
-                        
-                        // Today Birthdays Card
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(LinearGradient(
-                                    gradient: Gradient(colors: cardGradientColors),
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ))
-                                .frame(height: 160)
-                            
-                            // Background Icons
-                            HStack {
-                                VStack {
-                                    Image(systemName: "calendar")
-                                        .font(.system(size: 30))
-                                        .foregroundColor(.white.opacity(0.3))
-                                    Spacer()
-                                    Image(systemName: "calendar")
-                                        .font(.system(size: 25))
-                                        .foregroundColor(.white.opacity(0.2))
-                                }
-                                
-                                Spacer()
-                                
-                                // Balloons
-                                VStack {
-                                    HStack {
-                                        Circle()
-                                            .fill(Color.white.opacity(0.4))
-                                            .frame(width: 12, height: 12)
-                                        Circle()
-                                            .fill(Color.white.opacity(0.3))
-                                            .frame(width: 8, height: 8)
-                                    }
-                                    Spacer()
-                                    HStack {
-                                        Circle()
-                                            .fill(Color.white.opacity(0.2))
-                                            .frame(width: 10, height: 10)
-                                        Circle()
-                                            .fill(Color.white.opacity(0.25))
-                                            .frame(width: 6, height: 6)
-                                    }
-                                }
-                                .padding(.trailing, 20)
-                                .padding(.top, 20)
-                            }
-                            .padding(.horizontal, 20)
-                            
-                            // Main Content
-                            VStack(spacing: 12) {
-                                Text("Let's Celebrate Today!")
-                                    .font(.system(size: 24, weight: .bold))
-                                    .foregroundColor(.white)
-                                
-                                if hasEventsToday {
-                                    // Modern circular display with floating emojis - centered
-                                    HStack(spacing: 20) {
-                                        Spacer()
-                                        
-                                        ForEach(Array(groupedTodaysEvents.enumerated()), id: \.offset) { _, group in
-                                            VStack(spacing: 6) {
-                                                // Large emoji with glow effect
-                                                ZStack {
-                                                    Circle()
-                                                        .fill(Color.white.opacity(0.2))
-                                                        .frame(width: 50, height: 50)
-                                                        .blur(radius: 8)
-                                                    
-                                                    Circle()
-                                                        .fill(Color.white.opacity(0.15))
-                                                        .frame(width: 45, height: 45)
-                                                    
-                                                    Text(group.icon)
-                                                        .font(.system(size: 24))
-                                                }
-                                                
-                                                // Count badge below
-                                                Text("\(group.count)")
-                                                    .font(.system(size: 12, weight: .bold))
-                                                    .foregroundColor(.white)
-                                                    .frame(width: 20, height: 20)
-                                                    .background(Color.white.opacity(0.3))
-                                                    .cornerRadius(10)
-                                            }
-                                        }
-                                        
-                                        Spacer()
-                                    }
-                                    .padding(.horizontal, 20)
-                                } else {
-                                    Text("A quiet day today ☕️")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.8))
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        
-                        // Today's Celebrations (only show if there are events)
-                        if hasEventsToday {
-                            VStack(alignment: .leading, spacing: 16) {
-                                HStack {
-                                    Text("Today's Celebrations")
-                                        .font(.system(size: 20, weight: .bold))
-                                        .foregroundColor(.primary)
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 20)
-                            
-                                VStack(spacing: 12) {
-                                    ForEach(Array(todaysEvents.enumerated()), id: \.offset) { _, event in
-                                        HStack(spacing: 16) {
-                                            // Event Icon
-                                            ZStack {
-                                                RoundedRectangle(cornerRadius: 16)
-                                                    .fill(Color.blue.opacity(0.2))
-                                                    .frame(width: 60, height: 60)
-                                                
-                                                Text(event.emoji)
-                                                    .font(.system(size: 30))
-                                            }
-                                            
-                                            // Event Details
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                Text(event.name)
-                                                    .font(.system(size: 18, weight: .semibold))
-                                                    .foregroundColor(.primary)
-                                                
-                                                HStack(alignment: .bottom, spacing: 4) {
-                                                    Text(currentDateInfo.day)
-                                                        .font(.system(size: 32, weight: .bold))
-                                                        .foregroundColor(.primary)
-                                                    
-                                                    Text(currentDateInfo.month)
-                                                        .font(.system(size: 16, weight: .medium))
-                                                        .foregroundColor(.secondary)
-                                                        .offset(y: -4)
-                                                }
-                                            }
-                                            
-                                            Spacer()
-                                            
-                                            // More Button
-                                            Button(action: {
-                                                // TODO: More options
-                                            }) {
-                                                Image(systemName: "ellipsis")
-                                                    .font(.system(size: 16, weight: .bold))
-                                                    .foregroundColor(.secondary)
-                                                    .rotationEffect(.degrees(90))
-                                            }
-                                        }
-                                        .padding(16)
-                                        .background(Color(.systemBackground))
-                                        .cornerRadius(16)
-                                        .padding(.horizontal, 20)
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // Don't Miss These Moments Section
-                        VStack(alignment: .leading, spacing: 16) {
-                            HStack {
-                                Text("Don't Miss These Moments")
-                                    .font(.system(size: 20, weight: .bold))
-                                    .foregroundColor(.primary)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 20)
-                            
-                            let weeklyEvents = getWeeklyEvents()
-                            if !weeklyEvents.isEmpty {
-                                VStack(spacing: 12) {
-                                    ForEach(weeklyEvents) { event in
-                                        HStack(spacing: 16) {
-                                            // Event Icon
-                                            ZStack {
-                                                RoundedRectangle(cornerRadius: 16)
-                                                    .fill(Color.purple.opacity(0.2))
-                                                    .frame(width: 60, height: 60)
-                                                
-                                                Text(event.icon)
-                                                    .font(.system(size: 30))
-                                            }
-                                            
-                                            // Event Details
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                Text(event.displayName)
-                                                    .font(.system(size: 18, weight: .semibold))
-                                                    .foregroundColor(.primary)
-                                                
-                                                HStack(alignment: .bottom, spacing: 4) {
-                                                    let calendar = Calendar.current
-                                                    let day = calendar.component(.day, from: event.date)
-                                                    let monthName = calendar.monthSymbols[calendar.component(.month, from: event.date) - 1]
-                                                    
-                                                    Text("\(day)")
-                                                        .font(.system(size: 32, weight: .bold))
-                                                        .foregroundColor(.primary)
-                                                    
-                                                    Text(monthName)
-                                                        .font(.system(size: 16, weight: .medium))
-                                                        .foregroundColor(.secondary)
-                                                        .offset(y: -4)
-                                                }
-                                            }
-                                            
-                                            Spacer()
-                                            
-                                            // More Button
-                                            Button(action: {
-                                                // TODO: More options
-                                            }) {
-                                                Image(systemName: "ellipsis")
-                                                    .font(.system(size: 16, weight: .bold))
-                                                    .foregroundColor(.secondary)
-                                                    .rotationEffect(.degrees(90))
-                                            }
-                                        }
-                                        .padding(16)
-                                        .background(Color(.systemBackground))
-                                        .cornerRadius(16)
-                                        .padding(.horizontal, 20)
-                                    }
-                                }
-                            } else {
-                                VStack(spacing: 12) {
-                                    Text("Bu hafta özel bir etkinlik yok")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.secondary)
-                                        .multilineTextAlignment(.center)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 40)
-                                .background(Color(.systemBackground))
-                                .cornerRadius(12)
-                                .padding(.horizontal, 20)
-                            }
-                        }
-                        .padding(.top, 20)
-                        
-                    } else if selectedTab == "Week" {
+                    Group {
+                        if selectedTab == "Today" {
+                            todayTabContent
+                        } else if selectedTab == "Week" {
                         // Modern Week Calendar View
                         VStack(spacing: 24) {
                             // Month/Year Header with Navigation
@@ -1356,7 +1587,7 @@ struct DummyMainCalendarView: View {
                         }
                     }
                     
-                    Spacer(minLength: 100) // Tab bar için boşluk
+                    Spacer(minLength: 20) // Tab bar için boşluk
                 }
             }
             .gesture(
@@ -1373,384 +1604,32 @@ struct DummyMainCalendarView: View {
                         }
                     }
             )
-            
-            Spacer()
-            
-            // Custom Tab Bar
-            HStack(spacing: 0) {
-                // Home Tab
-                VStack(spacing: 4) {
-                    Image(systemName: "house.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
-                    
-                    Text("Home")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color(red: 0.25, green: 0.35, blue: 0.45))
-                }
-                .frame(maxWidth: .infinity)
-                
-                // Add Special Day Tab
-                Button(action: {
-                    showingAddSpecialDay = true
-                }) {
-                    VStack(spacing: 4) {
-                        Image(systemName: "calendar.badge.plus")
-                            .font(.system(size: 24))
-                            .foregroundColor(.secondary)
-                        
-                        Text("Add Special Day")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.secondary)
+        }
+        .gesture(
+            DragGesture()
+                .onEnded { value in
+                    if value.translation.width < -50 { // Sağa kaydırma
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            currentDayOffset = min(currentDayOffset + 1, 2)
+                        }
+                    } else if value.translation.width > 50 { // Sola kaydırma
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            currentDayOffset = max(currentDayOffset - 1, -2)
+                        }
                     }
                 }
-                .buttonStyle(PlainButtonStyle())
-                .frame(maxWidth: .infinity)
-                
-                // Celebrate Tab
-                Button(action: {
-                    showingCelebrate = true
-                }) {
-                    VStack(spacing: 4) {
-                        Image(systemName: "party.popper.fill")
-                            .font(.system(size: 24))
-                            .foregroundColor(.secondary)
-                        
-                        Text("Celebrate")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-            .padding(.horizontal, 40)
-            .padding(.vertical, 16)
-            .background(Color(.systemBackground))
-            .overlay(
-                Rectangle()
-                    .fill(Color(.systemGray5))
-                    .frame(height: 0.5),
-                alignment: .top
-            )
-        }
-        .id(userEvents.count) // Force refresh when user events change
-        .background(Color(.systemGroupedBackground))
-        .sheet(isPresented: $showingAddSpecialDay) {
-            AddSpecialDayView(userEvents: $userEvents)
-        }
-        .sheet(isPresented: $showingCelebrate) {
-            CelebrateView()
-        }
+        )
     }
 }
 
-// MARK: - Celebrate View
-struct CelebrateView: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 32) {
-                    // Top Spacing
-                    Spacer()
-                        .frame(height: 20)
-                    
-                    // Header
-                    VStack(spacing: 12) {
-                        Text("Celebrate")
-                            .font(.system(size: 36, weight: .bold))
-                            .foregroundColor(.white)
-                        
-                        Text("Craft the perfect birthday wish 🥳")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(.white.opacity(0.8))
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.horizontal, 20)
-                    
-                    // Celebration Cards Section
-                    VStack(alignment: .leading, spacing: 20) {
-                        HStack {
-                            Text("Celebration Cards")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(.white)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 20)
-                        
-                        LazyVGrid(columns: [
-                            GridItem(.flexible(), spacing: 12),
-                            GridItem(.flexible(), spacing: 12),
-                            GridItem(.flexible(), spacing: 12)
-                        ], spacing: 16) {
-                            // Make a Wish Birthday Cake
-                            VStack(spacing: 12) {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color(red: 0.95, green: 0.92, blue: 0.88))
-                                    .frame(height: 120)
-                                    .overlay(
-                                        VStack(spacing: 6) {
-                                            // Birthday cake layers with candles
-                                            VStack(spacing: 2) {
-                                                // Candles
-                                                HStack(spacing: 3) {
-                                                    ForEach(0..<6, id: \.self) { _ in
-                                                        VStack(spacing: 0) {
-                                                            Text("🕯️")
-                                                                .font(.system(size: 8))
-                                                        }
-                                                    }
-                                                }
-                                                
-                                                // Cake layers
-                                                RoundedRectangle(cornerRadius: 4)
-                                                    .fill(Color(red: 0.8, green: 0.3, blue: 0.3))
-                                                    .frame(width: 60, height: 8)
-                                                RoundedRectangle(cornerRadius: 4)
-                                                    .fill(Color(red: 0.95, green: 0.85, blue: 0.8))
-                                                    .frame(width: 65, height: 8)
-                                                RoundedRectangle(cornerRadius: 4)
-                                                    .fill(Color(red: 0.9, green: 0.6, blue: 0.7))
-                                                    .frame(width: 70, height: 8)
-                                                RoundedRectangle(cornerRadius: 4)
-                                                    .fill(Color(red: 0.95, green: 0.85, blue: 0.8))
-                                                    .frame(width: 75, height: 8)
-                                                RoundedRectangle(cornerRadius: 4)
-                                                    .fill(Color(red: 0.9, green: 0.7, blue: 0.4))
-                                                    .frame(width: 80, height: 8)
-                                            }
-                                            
-                                            Text("MAKE A WISH")
-                                                .font(.system(size: 10, weight: .bold))
-                                                .foregroundColor(.black)
-                                        }
-                                    )
-                            }
-                            
-                            // Happy Anniversary
-                            VStack(spacing: 12) {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color(red: 0.35, green: 0.45, blue: 0.65))
-                                    .frame(height: 120)
-                                    .overlay(
-                                        VStack(spacing: 4) {
-                                            Text("WISHING YOU")
-                                                .font(.system(size: 8, weight: .bold))
-                                                .foregroundColor(.yellow)
-                                            Text("LOTS OF LOVE")
-                                                .font(.system(size: 8, weight: .bold))
-                                                .foregroundColor(.yellow)
-                                            Text("AND HAPPINESS")
-                                                .font(.system(size: 8, weight: .bold))
-                                                .foregroundColor(.yellow)
-                                            
-                                            // Wedding couple on cake with balloons
-                                            VStack(spacing: 2) {
-                                                HStack(spacing: 8) {
-                                                    Text("🎈")
-                                                        .font(.system(size: 10))
-                                                    HStack(spacing: 2) {
-                                                        Text("👰🏻")
-                                                            .font(.system(size: 12))
-                                                        Text("🤵🏻")
-                                                            .font(.system(size: 12))
-                                                    }
-                                                    Text("🎈")
-                                                        .font(.system(size: 10))
-                                                }
-                                                RoundedRectangle(cornerRadius: 6)
-                                                    .fill(Color.white.opacity(0.9))
-                                                    .frame(width: 50, height: 12)
-                                            }
-                                            
-                                            Text("HAPPY")
-                                                .font(.system(size: 10, weight: .bold))
-                                                .foregroundColor(.pink)
-                                            Text("ANNIVERSARY")
-                                                .font(.system(size: 10, weight: .bold))
-                                                .foregroundColor(.pink)
-                                        }
-                                    )
-                            }
-                            
-                            // Maria's 24th Birthday (Cocktail Theme)
-                            VStack(spacing: 12) {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color(red: 0.9, green: 0.9, blue: 0.92))
-                                    .frame(height: 120)
-                                    .overlay(
-                                        VStack(spacing: 4) {
-                                            // Disco balls
-                                            HStack(spacing: 8) {
-                                                Text("🪩")
-                                                    .font(.system(size: 16))
-                                                Text("🪩")
-                                                    .font(.system(size: 12))
-                                            }
-                                            .offset(x: 15, y: -5)
-                                            
-                                            Text("Maria's 24th")
-                                                .font(.system(size: 11, weight: .bold, design: .serif))
-                                                .foregroundColor(.black)
-                                                .italic()
-                                            Text("birthday")
-                                                .font(.system(size: 11, weight: .bold, design: .serif))
-                                                .foregroundColor(.black)
-                                                .italic()
-                                            
-                                            // Cocktail glass with grapefruit
-                                            VStack(spacing: 0) {
-                                                Text("🍸")
-                                                    .font(.system(size: 20))
-                                                Text("🍊")
-                                                    .font(.system(size: 8))
-                                                    .offset(x: -8, y: -5)
-                                            }
-                                        }
-                                    )
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    }
-                    
-                    // AI Message Generator Section
-                    VStack(alignment: .leading, spacing: 20) {
-                        HStack {
-                            Text("AI Message Generator")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(.white)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 20)
-                        
-                        Button(action: {
-                            // TODO: AI Message Generator action
-                        }) {
-                            HStack(spacing: 16) {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 24, weight: .bold))
-                                    .foregroundColor(.white)
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Get a")
-                                        .font(.system(size: 18, weight: .semibold))
-                                        .foregroundColor(.white)
-                                    Text("Personalized Message")
-                                        .font(.system(size: 18, weight: .semibold))
-                                        .foregroundColor(.white)
-                                }
-                                
-                                Spacer()
-                            }
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 20)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color.blue, Color.purple],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .cornerRadius(16)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .padding(.horizontal, 20)
-                    }
-                    
-                    // Birthday GIFs Section
-                    VStack(alignment: .leading, spacing: 20) {
-                        HStack {
-                            Text("Birthday GIFs")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(.white)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 20)
-                        
-                        LazyVGrid(columns: [
-                            GridItem(.flexible(), spacing: 12),
-                            GridItem(.flexible(), spacing: 12),
-                            GridItem(.flexible(), spacing: 12)
-                        ], spacing: 16) {
-                            // Happy Birthday GIF (Dark)
-                            VStack(spacing: 12) {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color(red: 0.15, green: 0.15, blue: 0.25))
-                                    .frame(height: 120)
-                                    .overlay(
-                                        VStack(spacing: 8) {
-                                            Text("✨ ⭐ ✨")
-                                                .font(.system(size: 16))
-                                            Text("HAPPY")
-                                                .font(.system(size: 16, weight: .bold))
-                                                .foregroundColor(.white)
-                                            Text("BIRTHDAY")
-                                                .font(.system(size: 12, weight: .bold))
-                                                .foregroundColor(.white)
-                                            Text("✨ ⭐ ✨")
-                                                .font(.system(size: 16))
-                                        }
-                                    )
-                            }
-                            
-                            // Balloons (Pink)
-                            VStack(spacing: 12) {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color(red: 0.9, green: 0.7, blue: 0.7))
-                                    .frame(height: 120)
-                                    .overlay(
-                                        VStack(spacing: 8) {
-                                            Text("🎈🎈")
-                                                .font(.system(size: 32))
-                                            Text("😊 😊")
-                                                .font(.system(size: 24))
-                                        }
-                                    )
-                            }
-                            
-                            // Party Hat (Light Blue)
-                            VStack(spacing: 12) {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color(red: 0.7, green: 0.85, blue: 0.95))
-                                    .frame(height: 120)
-                                    .overlay(
-                                        VStack(spacing: 8) {
-                                            Text("🎉")
-                                                .font(.system(size: 32))
-                                            Text("🎊 🎈")
-                                                .font(.system(size: 24))
-                                        }
-                                    )
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    }
-                    
-                    Spacer(minLength: 100)
-                }
-            }
-            .navigationBarHidden(true)
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.25, green: 0.35, blue: 0.45).opacity(0.9),
-                        Color(red: 0.25, green: 0.35, blue: 0.45)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-        }
-    }
-}
 
 #Preview {
     ContentView()
 }
 
-// MARK: - Add Special Day View
+// MARK: - Add Special Day View (moved to Features/Events/Views/AddSpecialDayView.swift)
+// Duplicate definition removed - using external file
+/*
 struct AddSpecialDayView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var userEvents: [UserEvent]
@@ -1986,8 +1865,11 @@ struct AddSpecialDayView: View {
         dismiss()
     }
 }
+*/
 
-// MARK: - Supporting Views
+// MARK: - Supporting Views (moved to Features/Events/Views/EventTypeCard.swift)
+// Duplicate definition removed - using external file
+/*
 struct EventTypeCard: View {
     let eventType: AddSpecialDayView.EventType
     let isSelected: Bool
@@ -2141,6 +2023,7 @@ struct EventTypeCard: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.75), value: showingCustomInput)
     }
 }
+*/
 
 struct CustomTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
@@ -2311,6 +2194,9 @@ struct FunEventTypeRow: View {
     }
 }
 
+// MARK: - CalendarPickerView (moved to Features/Events/Views/CalendarPickerView.swift)
+// Duplicate definition removed - using external file
+/*
 struct CalendarPickerView: View {
     @Binding var selectedDate: Date
     let onDateSelected: () -> Void
@@ -2395,7 +2281,11 @@ struct CalendarPickerView: View {
         }
     }
 }
+*/
 
+// MARK: - IconSelectorView (moved to Features/Events/Views/IconSelectorView.swift)
+// Duplicate definition removed - using external file
+/*
 struct IconSelectorView: View {
     @Binding var selectedIcon: String
     let onIconSelected: () -> Void
@@ -2527,6 +2417,7 @@ struct IconSelectorView: View {
         }
     }
 }
+*/
 
 // MARK: - DummyMainCalendarView Extension
 extension DummyMainCalendarView {
@@ -2553,159 +2444,120 @@ extension DummyMainCalendarView {
 struct CalendarPermissionView: View {
     let calendarSyncViewModel: CalendarSyncViewModel
     @Environment(\.dismiss) private var dismiss
-    @State private var animateIcon = false
-    @State private var animateContent = false
+    @State private var isRequestingPermission = false
     
     var body: some View {
-        ZStack {
-            // Modern blur background
-            Color.clear
-                .background(.ultraThinMaterial)
-                .ignoresSafeArea()
+        VStack(spacing: 0) {
+            // Top handle indicator
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color.secondary.opacity(0.3))
+                .frame(width: 36, height: 5)
+                .padding(.top, 8)
             
-            // Main content container
-            VStack(spacing: 0) {
-                // Top spacer
+            // Main content
+            VStack(spacing: 24) {
+                // Icon - Apple style
+                ZStack {
+                    // Background circle with Apple's teal/cyan color
+                    Circle()
+                        .fill(Color(red: 0.0, green: 0.7, blue: 0.8).opacity(0.15))
+                        .frame(width: 80, height: 80)
+                    
+                    // Calendar icon with plus badge
+                    Image(systemName: "calendar.badge.plus")
+                        .font(.system(size: 40, weight: .medium))
+                        .foregroundColor(Color(red: 0.0, green: 0.7, blue: 0.8))
+                }
+                .padding(.top, 20)
+                
+                // Title - Apple style
+                Text("Apple Takvim Erişimi")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.center)
+                
+                // Description - Apple style
+                Text("Apple Takviminizdeki doğum günlerini otomatik olarak senkronize etmek için takvim erişim izni verin. Bu sayede hiçbir önemli günü kaçırmazsınız.")
+                    .font(.system(size: 15))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(2)
+                    .padding(.horizontal, 20)
+                
                 Spacer()
                 
-                // Content card
-                VStack(spacing: 32) {
-                    // Animated icon with gradient background
-                    ZStack {
-                        // Gradient background circle
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.green.opacity(0.2), .blue.opacity(0.1)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 100, height: 100)
-                            .scaleEffect(animateIcon ? 1.0 : 0.8)
-                            .opacity(animateIcon ? 1.0 : 0.6)
-                        
-                        // Main icon
-                        Image(systemName: "calendar.badge.plus")
-                            .font(.system(size: 50, weight: .medium))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.green, .blue],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .scaleEffect(animateIcon ? 1.0 : 0.9)
-                    }
-                    .onAppear {
-                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                            animateIcon = true
+                // Action buttons - Apple style
+                VStack(spacing: 12) {
+                    // Primary button - Allow (Apple blue)
+                    Button(action: {
+                        isRequestingPermission = true
+                        Task {
+                            await calendarSyncViewModel.requestCalendarPermission()
+                            // İzin verildiğinde UserDefaults'a kaydet
+                            let status = EKEventStore.authorizationStatus(for: .event)
+                            var hasPermission = false
+                            if #available(iOS 17.0, *) {
+                                hasPermission = (status == .fullAccess)
+                            } else {
+                                hasPermission = (status == .authorized)
+                            }
+                            
+                            if hasPermission {
+                                UserDefaults.standard.set(true, forKey: "hasShownCalendarPermission")
+                            }
+                            isRequestingPermission = false
+                            dismiss()
                         }
-                    }
-                    
-                    // Text content
-                    VStack(spacing: 16) {
-                        // Title
-                        Text("Apple Takvim Erişimi")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundColor(.primary)
-                            .opacity(animateContent ? 1.0 : 0.0)
-                            .offset(y: animateContent ? 0 : 20)
-                        
-                        // Description
-                        Text("Apple Takviminizdeki doğum günlerini otomatik olarak senkronize etmek için takvim erişim izni verin. Bu sayede hiçbir önemli günü kaçırmazsınız.")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .lineSpacing(4)
-                            .opacity(animateContent ? 1.0 : 0.0)
-                            .offset(y: animateContent ? 0 : 20)
-                    }
-                    .onAppear {
-                        withAnimation(.spring(response: 0.8, dampingFraction: 0.9).delay(0.2)) {
-                            animateContent = true
-                        }
-                    }
-                    
-                    // Action buttons
-                    VStack(spacing: 12) {
-                        // Primary button - Allow
-                        Button(action: {
-                            Task {
-                                await calendarSyncViewModel.requestCalendarPermission()
-                            }
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                dismiss()
-                            }
-                        }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 16, weight: .semibold))
-                                
-                                Text("İzin Ver")
-                                    .font(.system(size: 17, weight: .semibold))
-                            }
+                    }) {
+                        Text("İzin Ver")
+                            .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 56)
-                            .background(
-                                LinearGradient(
-                                    colors: [.green, .blue],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .shadow(color: .green.opacity(0.3), radius: 8, x: 0, y: 4)
-                        }
-                        .scaleEffect(animateContent ? 1.0 : 0.95)
-                        .opacity(animateContent ? 1.0 : 0.0)
-                        
-                        // Secondary button - Not now
-                        Button(action: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                dismiss()
-                            }
-                        }) {
-                            Text("Şimdi Değil")
-                                .font(.system(size: 17, weight: .medium))
-                                .foregroundColor(.secondary)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 56)
-                                .background(Color(.systemGray6))
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
-                        }
-                        .scaleEffect(animateContent ? 1.0 : 0.95)
-                        .opacity(animateContent ? 1.0 : 0.0)
+                            .frame(height: 50)
+                            .background(Color(red: 0.0, green: 0.48, blue: 1.0)) // Apple blue
+                            .cornerRadius(12)
                     }
-                    .onAppear {
-                        withAnimation(.spring(response: 0.8, dampingFraction: 0.9).delay(0.4)) {
-                            animateContent = true
-                        }
+                    .disabled(isRequestingPermission)
+                    
+                    // Secondary button - Not now
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Text("Şimdi Değil")
+                            .font(.system(size: 17, weight: .regular))
+                            .foregroundColor(.blue)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
                     }
+                    .disabled(isRequestingPermission)
                 }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 32)
-                .background(
-                    RoundedRectangle(cornerRadius: 24)
-                        .fill(.regularMaterial)
-                        .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 10)
-                )
                 .padding(.horizontal, 20)
-                
-                // Bottom spacer
-                Spacer()
+                .padding(.bottom, 20)
             }
         }
-        .onAppear {
-            // Start animations
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                animateIcon = true
-            }
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.9).delay(0.2)) {
-                animateContent = true
-            }
-        }
+        .background(Color(.systemBackground))
+        .cornerRadius(20, corners: [.topLeft, .topRight])
+    }
+}
+
+// Helper extension for corner radius
+extension View {
+    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
+        clipShape(RoundedCorner(radius: radius, corners: corners))
+    }
+}
+
+struct RoundedCorner: Shape {
+    var radius: CGFloat = .infinity
+    var corners: UIRectCorner = .allCorners
+
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(
+            roundedRect: rect,
+            byRoundingCorners: corners,
+            cornerRadii: CGSize(width: radius, height: radius)
+        )
+        return Path(path.cgPath)
     }
 }
 

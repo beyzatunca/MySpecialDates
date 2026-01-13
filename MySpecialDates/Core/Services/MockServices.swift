@@ -74,6 +74,7 @@ protocol FirebaseUserRepositoryProtocol {
 }
 
 // MARK: - Firebase Auth Service Protocol
+@MainActor
 protocol FirebaseAuthServiceProtocol {
     func signUp(email: String, password: String, firstName: String, lastName: String, phoneNumber: String?, birthDate: Date) async throws -> FirebaseUserModel
     func signIn(email: String, password: String) async throws -> FirebaseUserModel
@@ -226,8 +227,12 @@ class MockFirebaseAuthService: FirebaseAuthServiceProtocol {
 class MockBirthdayManager: BirthdayManagerProtocol {
     private let firebaseRepository: FirebaseUserRepositoryProtocol
     
-    init(firebaseRepository: FirebaseUserRepositoryProtocol = MockFirebaseUserRepository()) {
+    init(firebaseRepository: FirebaseUserRepositoryProtocol) {
         self.firebaseRepository = firebaseRepository
+    }
+    
+    convenience init() {
+        self.init(firebaseRepository: MockFirebaseUserRepository())
     }
     
     func findMatchingUsers(for contacts: [ContactModel]) async throws -> [(ContactModel, FirebaseUserModel)] {

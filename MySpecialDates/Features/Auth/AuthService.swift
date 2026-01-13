@@ -2,8 +2,11 @@ import Foundation
 import Combine
 
 enum AuthError: Error, LocalizedError {
-    case invalidEmail
-    case invalidPassword
+    case invalidEmail(String) // Detaylı hata mesajı
+    case invalidPassword(String) // Detaylı hata mesajı
+    case invalidName
+    case invalidAge
+    case invalidPhoneNumber
     case userNotFound
     case userAlreadyExists
     case invalidCredentials
@@ -12,10 +15,16 @@ enum AuthError: Error, LocalizedError {
     
     var errorDescription: String? {
         switch self {
-        case .invalidEmail:
-            return "Geçersiz email adresi"
-        case .invalidPassword:
-            return "Geçersiz şifre"
+        case .invalidEmail(let message):
+            return message
+        case .invalidPassword(let message):
+            return message
+        case .invalidName:
+            return "Geçersiz isim. İsim en az 2, en fazla 50 karakter olmalıdır."
+        case .invalidAge:
+            return "Geçersiz yaş. Yaşınız 13 ile 120 arasında olmalıdır."
+        case .invalidPhoneNumber:
+            return "Geçersiz telefon numarası. Lütfen geçerli bir telefon numarası girin."
         case .userNotFound:
             return "Kullanıcı bulunamadı"
         case .userAlreadyExists:
@@ -49,28 +58,30 @@ class AuthService: AuthServiceProtocol {
     func signUp(email: String, password: String, firstName: String, lastName: String, phoneNumber: String, birthDate: Date) async throws -> User {
         
         // Validation
-        guard ValidationUtils.isValidEmail(email) else {
-            throw AuthError.invalidEmail
+        let emailValidation = ValidationUtils.validateEmail(email)
+        guard case .valid = emailValidation else {
+            throw AuthError.invalidEmail(emailValidation.errorMessage())
         }
         
-        guard ValidationUtils.isValidPassword(password) else {
-            throw AuthError.invalidPassword
+        let passwordValidation = ValidationUtils.validatePassword(password)
+        guard case .valid = passwordValidation else {
+            throw AuthError.invalidPassword(passwordValidation.errorMessage())
         }
         
         guard ValidationUtils.isValidName(firstName) && ValidationUtils.isValidName(lastName) else {
-            throw AuthError.invalidEmail
+            throw AuthError.invalidName
         }
         
         guard ValidationUtils.isValidAge(birthDate) else {
-            throw AuthError.invalidEmail
+            throw AuthError.invalidAge
         }
         
         guard ValidationUtils.isValidPhoneNumber(phoneNumber) else {
-            throw AuthError.invalidEmail
+            throw AuthError.invalidPhoneNumber
         }
         
         // Check if user already exists
-        if let existingUser = try await userRepository.getUserByEmail(email) {
+        if (try await userRepository.getUserByEmail(email)) != nil {
             throw AuthError.userAlreadyExists
         }
         
@@ -95,12 +106,14 @@ class AuthService: AuthServiceProtocol {
     func signIn(email: String, password: String) async throws -> User {
         
         // Validation
-        guard ValidationUtils.isValidEmail(email) else {
-            throw AuthError.invalidEmail
+        let emailValidation = ValidationUtils.validateEmail(email)
+        guard case .valid = emailValidation else {
+            throw AuthError.invalidEmail(emailValidation.errorMessage())
         }
         
-        guard ValidationUtils.isValidPassword(password) else {
-            throw AuthError.invalidPassword
+        let passwordValidation = ValidationUtils.validatePassword(password)
+        guard case .valid = passwordValidation else {
+            throw AuthError.invalidPassword(passwordValidation.errorMessage())
         }
         
         // Get user

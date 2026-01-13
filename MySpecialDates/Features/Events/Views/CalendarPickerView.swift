@@ -134,7 +134,7 @@ struct CalendarPickerView: View {
 }
 
 #Preview {
-    CalendarPickerView(selectedDate: .constant(Date())) {
+    CalendarPickerView(selectedDate: .constant(Date()), onDateSelected: {
         print("Date selected")
-    }
+    })
 }

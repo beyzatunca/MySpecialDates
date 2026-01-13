@@ -99,38 +99,40 @@ struct CalendarView: View {
     
     // MARK: - Sync Button
     private var syncButton: some View {
-        Button(action: {
-            Task {
-                await viewModel.startContactSync()
-            }
-        }) {
-            HStack {
-                if viewModel.isSyncing {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(0.8)
-                } else {
-                    Image(systemName: "arrow.clockwise")
+        VStack(spacing: 8) {
+            Button(action: {
+                Task {
+                    await viewModel.startContactSync()
                 }
-                
-                Text(viewModel.syncStatusText)
-                    .fontWeight(.medium)
+            }) {
+                HStack {
+                    if viewModel.isSyncing {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    
+                    Text(viewModel.syncStatusText)
+                        .fontWeight(.medium)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(12)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 44)
-            .background(Color.blue)
-            .foregroundColor(.white)
-            .cornerRadius(12)
-        }
-        .disabled(viewModel.isSyncing)
-        .padding(.horizontal)
-        
-        // Progress bar
-        if viewModel.isSyncing {
-            ProgressView(value: viewModel.syncProgress)
-                .progressViewStyle(LinearProgressViewStyle())
-                .padding(.horizontal)
-                .padding(.top, 8)
+            .disabled(viewModel.isSyncing)
+            .padding(.horizontal)
+            
+            // Progress bar
+            if viewModel.isSyncing {
+                ProgressView(value: viewModel.syncProgress)
+                    .progressViewStyle(LinearProgressViewStyle())
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+            }
         }
     }
     

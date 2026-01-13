@@ -47,6 +47,7 @@ enum CalendarAccessError: Error, LocalizedError {
 }
 
 // MARK: - Apple Calendar Service Protocol
+@MainActor
 protocol AppleCalendarServiceProtocol {
     func requestCalendarAccess() async throws -> Bool
     func getCalendarPermissionStatus() -> EKAuthorizationStatus
@@ -73,17 +74,33 @@ class AppleCalendarService: ObservableObject, AppleCalendarServiceProtocol {
         
         switch status {
         case .authorized:
-            permissionStatus = .authorized
-            return true
+            // iOS 17+: Check if we have full access
+            if #available(iOS 17.0, *) {
+                // For iOS 17+, we need to check full access status
+                // Since .authorized is deprecated, we'll request full access to ensure we have it
+                let granted = try await eventStore.requestFullAccessToEvents()
+                permissionStatus = EKEventStore.authorizationStatus(for: .event)
+                return granted
+            } else {
+                // For iOS < 17, .authorized is still valid
+                permissionStatus = status
+                return true
+            }
             
         case .denied, .restricted:
             permissionStatus = status
             throw CalendarAccessError.accessDenied
             
         case .notDetermined:
-            let granted = try await eventStore.requestFullAccessToEvents()
-            permissionStatus = EKEventStore.authorizationStatus(for: .event)
-            return granted
+            if #available(iOS 17.0, *) {
+                let granted = try await eventStore.requestFullAccessToEvents()
+                permissionStatus = EKEventStore.authorizationStatus(for: .event)
+                return granted
+            } else {
+                let granted = try await eventStore.requestAccess(to: .event)
+                permissionStatus = EKEventStore.authorizationStatus(for: .event)
+                return granted
+            }
             
         @unknown default:
             permissionStatus = .denied
@@ -98,7 +115,10 @@ class AppleCalendarService: ObservableObject, AppleCalendarServiceProtocol {
     // MARK: - Event Fetching
     
     func fetchBirthdayEvents() async throws -> [AppleCalendarEvent] {
-        guard permissionStatus == .authorized else {
+        let currentStatus = EKEventStore.authorizationStatus(for: .event)
+        // For iOS 17+, .authorized is deprecated but still works
+        // We check for .authorized status which indicates full access
+        guard currentStatus == .authorized else {
             throw CalendarAccessError.accessDenied
         }
         
@@ -151,7 +171,8 @@ class AppleCalendarService: ObservableObject, AppleCalendarServiceProtocol {
     }
     
     func fetchAllEvents() async throws -> [AppleCalendarEvent] {
-        guard permissionStatus == .authorized else {
+        let currentStatus = EKEventStore.authorizationStatus(for: .event)
+        guard currentStatus == .authorized else {
             throw CalendarAccessError.accessDenied
         }
         

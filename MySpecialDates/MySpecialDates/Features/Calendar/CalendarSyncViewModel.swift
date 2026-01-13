@@ -129,7 +129,8 @@ class CalendarSyncViewModel: ObservableObject {
             return
         }
         
-        guard calendarPermissionStatus == .authorized else {
+        let currentStatus = EKEventStore.authorizationStatus(for: .event)
+        guard currentStatus == .authorized else {
             await requestCalendarPermission()
             return
         }
@@ -299,11 +300,13 @@ class CalendarSyncViewModel: ObservableObject {
     // MARK: - UI State Helpers
     
     var canSyncCalendar: Bool {
-        return isAuthenticated && calendarPermissionStatus == .authorized
+        let currentStatus = EKEventStore.authorizationStatus(for: .event)
+        return isAuthenticated && currentStatus == .authorized
     }
     
     var needsCalendarPermission: Bool {
-        return calendarPermissionStatus != .authorized
+        let currentStatus = EKEventStore.authorizationStatus(for: .event)
+        return currentStatus != .authorized
     }
     
     var syncInProgress: Bool {

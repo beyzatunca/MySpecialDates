@@ -9,6 +9,7 @@ import SwiftUI
 
 struct AddSpecialDayView: View {
     @Environment(\.dismiss) private var dismiss
+    @Binding var userEvents: [UserEvent]
     @State private var firstName = ""
     @State private var lastName = ""
     @State private var selectedType: EventType? = nil
@@ -18,6 +19,11 @@ struct AddSpecialDayView: View {
     @State private var selectedDate = Date()
     @State private var showingIconSelector = false
     @State private var selectedIcon = "🎉"
+    @State private var dateSelected = false
+    
+    init(userEvents: Binding<[UserEvent]> = .constant([])) {
+        self._userEvents = userEvents
+    }
     
     enum EventType: CaseIterable {
         case birthday
@@ -163,8 +169,10 @@ struct AddSpecialDayView: View {
                                                 if selectedType == eventType {
                                                     selectedType = nil
                                                     showingCustomOccasionInput = false
+                                                    dateSelected = false
                                                 } else {
                                                     selectedType = eventType
+                                                    dateSelected = false // Reset date selection when type changes
                                                     if eventType == .custom {
                                                         showingCustomOccasionInput = true
                                                     } else {
@@ -189,6 +197,45 @@ struct AddSpecialDayView: View {
                             .padding(.horizontal, 24)
                         }
                         .padding(.bottom, 40)
+                        
+                        // Create Button - Sadece tüm bilgiler doldurulduğunda görünür
+                        if canCreateEvent {
+                            VStack(spacing: 16) {
+                                Button(action: {
+                                    saveEvent()
+                                }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 18, weight: .semibold))
+                                        Text("Create")
+                                            .font(.system(size: 17, weight: .semibold, design: .rounded))
+                                    }
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 56)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [
+                                                selectedType?.color ?? Color.accentColor,
+                                                (selectedType?.color ?? Color.accentColor).opacity(0.8)
+                                            ],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .cornerRadius(16)
+                                    .shadow(
+                                        color: (selectedType?.color ?? Color.accentColor).opacity(0.4),
+                                        radius: 12,
+                                        x: 0,
+                                        y: 4
+                                    )
+                                }
+                                .padding(.horizontal, 24)
+                            }
+                            .padding(.bottom, 40)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
                     }
                 }
             }
@@ -208,10 +255,9 @@ struct AddSpecialDayView: View {
                     selectedDate: $selectedDate,
                     onDateSelected: {
                         showingCalendar = false
+                        dateSelected = true
                         if selectedType == .custom {
                             showingIconSelector = true
-                        } else {
-                            saveEvent()
                         }
                     }
                 )
@@ -221,16 +267,42 @@ struct AddSpecialDayView: View {
                     selectedIcon: $selectedIcon,
                     onIconSelected: {
                         showingIconSelector = false
-                        saveEvent()
                     }
                 )
             }
         }
     }
     
+    // Computed property to check if event can be created
+    private var canCreateEvent: Bool {
+        guard let eventType = selectedType else { return false }
+        guard dateSelected else { return false }
+        
+        // If custom event, customOccasionName must not be empty
+        if eventType == .custom {
+            return !customOccasionName.isEmpty
+        }
+        
+        return true
+    }
+    
     private func saveEvent() {
-        // TODO: Save event to database
-        print("Saving event: \(firstName) \(lastName), Type: \(selectedType?.title ?? ""), Date: \(selectedDate), Icon: \(selectedIcon)")
+        guard let eventType = selectedType else { return }
+        
+        let finalIcon = selectedIcon.isEmpty ? eventType.defaultIcon : selectedIcon
+        let customName = eventType == .custom ? (customOccasionName.isEmpty ? nil : customOccasionName) : nil
+        
+        let newEvent = UserEvent(
+            firstName: firstName,
+            lastName: lastName,
+            eventType: eventType.title,
+            customName: customName,
+            date: selectedDate,
+            icon: finalIcon
+        )
+        
+        userEvents.append(newEvent)
+        print("✅ Event saved: \(newEvent.displayName) on \(selectedDate)")
         dismiss()
     }
 }

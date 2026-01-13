@@ -3,6 +3,7 @@ import SwiftUI
 struct SignUpView: View {
     @StateObject private var viewModel = AuthViewModel()
     @Environment(\.dismiss) private var dismiss
+    @State private var showPassword = false
     
     var body: some View {
         ZStack {
@@ -61,9 +62,33 @@ struct SignUpView: View {
                                 .textFieldStyle(ModernTextFieldStyle())
                                 .keyboardType(.phonePad)
                             
-                            // Password Field
-                            SecureField("Password", text: $viewModel.password)
-                                .textFieldStyle(ModernTextFieldStyle())
+                            // Password Field with Visibility Toggle
+                            HStack {
+                                if showPassword {
+                                    TextField("Password", text: $viewModel.password)
+                                        .textFieldStyle(PlainTextFieldStyle())
+                                        .foregroundColor(.white)
+                                } else {
+                                    SecureField("Password", text: $viewModel.password)
+                                        .textFieldStyle(PlainTextFieldStyle())
+                                        .foregroundColor(.white)
+                                }
+                                
+                                Button(action: {
+                                    showPassword.toggle()
+                                }) {
+                                    Image(systemName: showPassword ? "eye.slash" : "eye")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+                            }
+                            .padding(16)
+                            .background(Color.white.opacity(0.15))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 25)
+                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                            )
+                            .cornerRadius(25)
                             
                             // Birth Date Picker
                             HStack {
@@ -129,6 +154,12 @@ struct SignUpView: View {
             }
         } message: {
             Text(viewModel.errorMessage ?? "Unknown error")
+        }
+        .onChange(of: viewModel.signUpSuccessful) { oldValue, newValue in
+            if newValue {
+                // Başarılı kayıt sonrası Login ekranına dön
+                dismiss()
+            }
         }
     }
 }

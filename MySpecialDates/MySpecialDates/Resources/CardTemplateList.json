@@ -1,0 +1,58 @@
+[
+  {
+    "id": "template-1",
+    "name": "Animal Themed",
+    "previewImageName": "animal-themed",
+    "backgroundImageName": "animal-themed",
+    "supportsUserPhoto": true,
+    "defaultTone": "sweet",
+    "category": "birthday",
+    "description": "A fun and playful card with adorable animal designs.",
+    "tags": ["animal", "birthday", "fun"]
+  },
+  {
+    "id": "template-2",
+    "name": "Balloon Themed",
+    "previewImageName": "baloon-themed",
+    "backgroundImageName": "baloon-themed",
+    "supportsUserPhoto": true,
+    "defaultTone": "funny",
+    "category": "birthday",
+    "description": "A festive card filled with colorful balloons for any celebration.",
+    "tags": ["balloon", "birthday", "celebration"]
+  },
+  {
+    "id": "template-3",
+    "name": "Bowling Themed",
+    "previewImageName": "bowling-themed",
+    "backgroundImageName": "bowling-themed",
+    "supportsUserPhoto": true,
+    "defaultTone": "casual",
+    "category": "birthday",
+    "description": "A unique and fun card perfect for bowling enthusiasts.",
+    "tags": ["bowling", "birthday", "sport"]
+  },
+  {
+    "id": "template-4",
+    "name": "Candle Themed",
+    "previewImageName": "candle-themed",
+    "backgroundImageName": "candle-themed",
+    "supportsUserPhoto": false,
+    "defaultTone": "sweet",
+    "category": "birthday",
+    "description": "A classic birthday card with beautiful candle designs.",
+    "tags": ["candle", "birthday", "classic"]
+  },
+  {
+    "id": "template-5",
+    "name": "Hand Drawn Black",
+    "previewImageName": "hand-drawed-black-themed",
+    "backgroundImageName": "hand-drawed-black-themed",
+    "supportsUserPhoto": true,
+    "defaultTone": "emotional",
+    "category": "general",
+    "description": "An elegant hand-drawn black themed card for special moments.",
+    "tags": ["hand-drawn", "elegant", "black"]
+  }
+]
+
