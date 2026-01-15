@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 struct AddSpecialDayView: View {
     @Environment(\.dismiss) private var dismiss
@@ -20,6 +21,8 @@ struct AddSpecialDayView: View {
     @State private var showingIconSelector = false
     @State private var selectedIcon = "🎉"
     @State private var dateSelected = false
+    @State private var selectedPhoto: PhotosPickerItem? = nil
+    @State private var eventPhoto: UIImage? = nil
     
     init(userEvents: Binding<[UserEvent]> = .constant([])) {
         self._userEvents = userEvents
@@ -28,12 +31,16 @@ struct AddSpecialDayView: View {
     enum EventType: CaseIterable {
         case birthday
         case anniversary
+        case graduation
+        case wedding
         case custom
         
         var title: String {
             switch self {
             case .birthday: return "Birthday"
             case .anniversary: return "Anniversary"
+            case .graduation: return "Graduation"
+            case .wedding: return "Wedding"
             case .custom: return "Your Own Occasion"
             }
         }
@@ -42,6 +49,8 @@ struct AddSpecialDayView: View {
             switch self {
             case .birthday: return "🎂"
             case .anniversary: return "💍"
+            case .graduation: return "🎓"
+            case .wedding: return "💒"
             case .custom: return "🎉"
             }
         }
@@ -50,6 +59,8 @@ struct AddSpecialDayView: View {
             switch self {
             case .birthday: return "birthday.cake.fill"
             case .anniversary: return "heart.fill"
+            case .graduation: return "graduationcap.fill"
+            case .wedding: return "heart.circle.fill"
             case .custom: return "sparkles"
             }
         }
@@ -58,6 +69,8 @@ struct AddSpecialDayView: View {
             switch self {
             case .birthday: return Color(red: 1.0, green: 0.6, blue: 0.7)
             case .anniversary: return Color(red: 0.9, green: 0.4, blue: 0.6)
+            case .graduation: return Color(red: 0.4, green: 0.6, blue: 0.9)
+            case .wedding: return Color(red: 0.95, green: 0.85, blue: 0.9)
             case .custom: return Color(red: 0.4, green: 0.6, blue: 0.9)
             }
         }
@@ -148,6 +161,74 @@ struct AddSpecialDayView: View {
                         .padding(.horizontal, 24)
                         .padding(.bottom, 32)
                         
+                        // Photo Section (Optional)
+                        VStack(alignment: .leading, spacing: 16) {
+                            Label("Photo (Optional)", systemImage: "photo")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .foregroundColor(.secondary)
+                                .textCase(.uppercase)
+                                .tracking(0.5)
+                                .padding(.horizontal, 24)
+                            
+                            VStack(spacing: 12) {
+                                PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                                    HStack {
+                                        if let photo = eventPhoto {
+                                            Image(uiImage: photo)
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(width: 60, height: 60)
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        } else {
+                                            HStack(spacing: 12) {
+                                                Image(systemName: "photo.badge.plus")
+                                                    .font(.system(size: 24))
+                                                    .foregroundColor(.secondary)
+                                                Text("Add Photo")
+                                                    .font(.system(size: 17, weight: .regular))
+                                                    .foregroundColor(.primary)
+                                            }
+                                            .frame(height: 60)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        if eventPhoto != nil {
+                                            Button(action: {
+                                                eventPhoto = nil
+                                                selectedPhoto = nil
+                                            }) {
+                                                Image(systemName: "xmark.circle.fill")
+                                                    .font(.system(size: 24))
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        } else {
+                                            Image(systemName: "chevron.right")
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 16)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(Color(.systemBackground))
+                                            .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
+                                    )
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                
+                                if eventPhoto == nil {
+                                    Text("Add a photo to personalize this event")
+                                        .font(.system(size: 13, weight: .regular))
+                                        .foregroundColor(.secondary)
+                                        .padding(.horizontal, 20)
+                                }
+                            }
+                            .padding(.horizontal, 24)
+                        }
+                        .padding(.bottom, 32)
+                        
                         // Event Type Section
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Event Type")
@@ -216,8 +297,8 @@ struct AddSpecialDayView: View {
                                     .background(
                                         LinearGradient(
                                             colors: [
-                                                selectedType?.color ?? Color.accentColor,
-                                                (selectedType?.color ?? Color.accentColor).opacity(0.8)
+                                                Color(red: 0.2, green: 0.3, blue: 0.5),
+                                                Color(red: 0.3, green: 0.4, blue: 0.6)
                                             ],
                                             startPoint: .leading,
                                             endPoint: .trailing
@@ -225,7 +306,7 @@ struct AddSpecialDayView: View {
                                     )
                                     .cornerRadius(16)
                                     .shadow(
-                                        color: (selectedType?.color ?? Color.accentColor).opacity(0.4),
+                                        color: Color(red: 0.2, green: 0.3, blue: 0.5).opacity(0.4),
                                         radius: 12,
                                         x: 0,
                                         y: 4
@@ -270,6 +351,14 @@ struct AddSpecialDayView: View {
                     }
                 )
             }
+            .onChange(of: selectedPhoto) { oldValue, newValue in
+                Task {
+                    if let data = try? await newValue?.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        eventPhoto = image
+                    }
+                }
+            }
         }
     }
     
@@ -291,6 +380,7 @@ struct AddSpecialDayView: View {
         
         let finalIcon = selectedIcon.isEmpty ? eventType.defaultIcon : selectedIcon
         let customName = eventType == .custom ? (customOccasionName.isEmpty ? nil : customOccasionName) : nil
+        let photoData = eventPhoto?.jpegData(compressionQuality: 0.8)
         
         let newEvent = UserEvent(
             firstName: firstName,
@@ -298,7 +388,8 @@ struct AddSpecialDayView: View {
             eventType: eventType.title,
             customName: customName,
             date: selectedDate,
-            icon: finalIcon
+            icon: finalIcon,
+            photoData: photoData
         )
         
         userEvents.append(newEvent)
@@ -325,8 +416,8 @@ struct EventTypeCard: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    eventType.color.opacity(0.2),
-                                    eventType.color.opacity(0.1)
+                                    Color(red: 0.2, green: 0.3, blue: 0.5).opacity(0.2),
+                                    Color(red: 0.3, green: 0.4, blue: 0.6).opacity(0.1)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -339,8 +430,8 @@ struct EventTypeCard: View {
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [
-                                    eventType.color,
-                                    eventType.color.opacity(0.7)
+                                    Color(red: 0.2, green: 0.3, blue: 0.5),
+                                    Color(red: 0.3, green: 0.4, blue: 0.6)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -366,7 +457,7 @@ struct EventTypeCard: View {
                 // Selection Indicator
                 ZStack {
                     Circle()
-                        .fill(isSelected ? eventType.color : Color(.systemGray5))
+                        .fill(isSelected ? Color(red: 0.2, green: 0.3, blue: 0.5) : Color(.systemGray5))
                         .frame(width: 24, height: 24)
                     
                     if isSelected {
@@ -382,7 +473,7 @@ struct EventTypeCard: View {
                 RoundedRectangle(cornerRadius: 20)
                     .fill(Color(.systemBackground))
                     .shadow(
-                        color: isSelected ? eventType.color.opacity(0.2) : .black.opacity(0.04),
+                        color: isSelected ? Color(red: 0.2, green: 0.3, blue: 0.5).opacity(0.2) : .black.opacity(0.04),
                         radius: isSelected ? 12 : 8,
                         x: 0,
                         y: isSelected ? 4 : 2
@@ -391,7 +482,7 @@ struct EventTypeCard: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
                     .stroke(
-                        isSelected ? eventType.color.opacity(0.4) : Color.clear,
+                        isSelected ? Color(red: 0.2, green: 0.3, blue: 0.5).opacity(0.4) : Color.clear,
                         lineWidth: 2
                     )
             )
@@ -435,8 +526,8 @@ struct EventTypeCard: View {
                     .background(
                         LinearGradient(
                             colors: [
-                                eventType.color,
-                                eventType.color.opacity(0.8)
+                                Color(red: 0.2, green: 0.3, blue: 0.5),
+                                Color(red: 0.3, green: 0.4, blue: 0.6)
                             ],
                             startPoint: .leading,
                             endPoint: .trailing
@@ -444,7 +535,7 @@ struct EventTypeCard: View {
                     )
                     .cornerRadius(16)
                     .shadow(
-                        color: eventType.color.opacity(0.4),
+                        color: Color(red: 0.2, green: 0.3, blue: 0.5).opacity(0.4),
                         radius: 12,
                         x: 0,
                         y: 4

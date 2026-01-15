@@ -10,6 +10,12 @@ struct UserEvent: Identifiable, Hashable {
     let customName: String?
     let date: Date
     let icon: String
+    let photoData: Data? // Optional photo data
+    
+    var photo: UIImage? {
+        guard let photoData = photoData else { return nil }
+        return UIImage(data: photoData)
+    }
     
     var displayName: String {
         if let customName = customName, !customName.isEmpty {
@@ -130,7 +136,8 @@ struct DummyMainCalendarView: View {
                 eventType: "Birthday",
                 customName: nil,
                 date: todayEvent,
-                icon: "🎂"
+                icon: "🎂",
+                photoData: nil
             ))
         }
         
@@ -143,7 +150,8 @@ struct DummyMainCalendarView: View {
                 eventType: "Anniversary",
                 customName: nil,
                 date: tomorrowEvent,
-                icon: "💍"
+                icon: "💍",
+                photoData: nil
             ))
             
             // Birthday 1
@@ -153,7 +161,8 @@ struct DummyMainCalendarView: View {
                 eventType: "Birthday",
                 customName: nil,
                 date: tomorrowEvent,
-                icon: "🎂"
+                icon: "🎂",
+                photoData: nil
             ))
             
             // Birthday 2
@@ -163,7 +172,8 @@ struct DummyMainCalendarView: View {
                 eventType: "Birthday",
                 customName: nil,
                 date: tomorrowEvent,
-                icon: "🎂"
+                icon: "🎂",
+                photoData: nil
             ))
             
             // Custom Event
@@ -173,7 +183,8 @@ struct DummyMainCalendarView: View {
                 eventType: "Custom",
                 customName: "Project Launch",
                 date: tomorrowEvent,
-                icon: "🚀"
+                icon: "🚀",
+                photoData: nil
             ))
         }
         
@@ -185,7 +196,8 @@ struct DummyMainCalendarView: View {
                 eventType: "Custom",
                 customName: "Graduation Party",
                 date: weekEvent1,
-                icon: "🎓"
+                icon: "🎓",
+                photoData: nil
             ))
         }
         
@@ -196,7 +208,8 @@ struct DummyMainCalendarView: View {
                 eventType: "Birthday",
                 customName: nil,
                 date: weekEvent2,
-                icon: "🎂"
+                icon: "🎂",
+                photoData: nil
             ))
         }
         
@@ -208,7 +221,8 @@ struct DummyMainCalendarView: View {
                 eventType: "Custom",
                 customName: "Concert Night",
                 date: nextWeekEvent,
-                icon: "🎵"
+                icon: "🎵",
+                photoData: nil
             ))
         }
         
@@ -220,7 +234,8 @@ struct DummyMainCalendarView: View {
                 eventType: "Anniversary",
                 customName: nil,
                 date: octoberEvent1,
-                icon: "💍"
+                icon: "💍",
+                photoData: nil
             ))
         }
         
@@ -231,7 +246,8 @@ struct DummyMainCalendarView: View {
                 eventType: "Custom",
                 customName: "Beach Party",
                 date: octoberEvent2,
-                icon: "🏖️"
+                icon: "🏖️",
+                photoData: nil
             ))
         }
         
@@ -243,7 +259,8 @@ struct DummyMainCalendarView: View {
                 eventType: "Custom",
                 customName: "Christmas Celebration",
                 date: decemberEvent,
-                icon: "🎄"
+                icon: "🎄",
+                photoData: nil
             ))
         }
         
@@ -365,17 +382,13 @@ struct DummyMainCalendarView: View {
         }
     }
     
-    private func getEvent(for date: Date) -> (name: String, emoji: String, time: String)? {
+    private func getEvent(for date: Date) -> UserEvent? {
         let calendar = Calendar.current
         
         // Check user events
-        if let userEvent = userEvents.first(where: { event in
+        return userEvents.first(where: { event in
             calendar.isDate(event.date, inSameDayAs: date)
-        }) {
-            return (userEvent.displayName, userEvent.icon, "Today")
-        }
-        
-        return nil
+        })
     }
     
     private func getFormattedDate(_ date: Date) -> String {
@@ -678,14 +691,22 @@ struct DummyMainCalendarView: View {
                 ForEach(Array(todaysUserEvents.enumerated()), id: \.element.id) { index, event in
                     let eventDisplay = todaysEvents[index]
                     HStack(spacing: 16) {
-                        // Event Icon
+                        // Event Icon or Photo
                         ZStack {
                             RoundedRectangle(cornerRadius: 16)
                                 .fill(Color.blue.opacity(0.2))
                                 .frame(width: 60, height: 60)
                             
-                            Text(eventDisplay.emoji)
-                                .font(.system(size: 30))
+                            if let photo = event.photo {
+                                Image(uiImage: photo)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 60, height: 60)
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                            } else {
+                                Text(eventDisplay.emoji)
+                                    .font(.system(size: 30))
+                            }
                         }
                         
                         // Event Details
@@ -778,14 +799,22 @@ struct DummyMainCalendarView: View {
                 VStack(spacing: 12) {
                     ForEach(weeklyEvents) { event in
                         HStack(spacing: 16) {
-                            // Event Icon
+                            // Event Icon or Photo
                             ZStack {
                                 RoundedRectangle(cornerRadius: 16)
                                     .fill(Color.purple.opacity(0.2))
                                     .frame(width: 60, height: 60)
                                 
-                                Text(event.icon)
-                                    .font(.system(size: 30))
+                                if let photo = event.photo {
+                                    Image(uiImage: photo)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 60, height: 60)
+                                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                                } else {
+                                    Text(event.icon)
+                                        .font(.system(size: 30))
+                                }
                             }
                             
                             // Event Details
@@ -1150,19 +1179,27 @@ struct DummyMainCalendarView: View {
                                         
                                         // Event Card
                                         HStack(spacing: 16) {
-                                            // Large Event Icon
+                                            // Large Event Icon or Photo
                                             ZStack {
                                                 RoundedRectangle(cornerRadius: 20)
                                                     .fill(Color.blue.opacity(0.15))
                                                     .frame(width: 80, height: 80)
                                                 
-                                                Text(event.emoji)
-                                                    .font(.system(size: 40))
+                                                if let photo = event.photo {
+                                                    Image(uiImage: photo)
+                                                        .resizable()
+                                                        .scaledToFill()
+                                                        .frame(width: 80, height: 80)
+                                                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                                                } else {
+                                                    Text(event.icon)
+                                                        .font(.system(size: 40))
+                                                }
                                             }
                                             
                                             // Event Details
                                             VStack(alignment: .leading, spacing: 6) {
-                                                Text(event.name)
+                                                Text(event.displayName)
                                                     .font(.system(size: 20, weight: .bold))
                                                     .foregroundColor(.primary)
                                                 
@@ -1365,19 +1402,27 @@ struct DummyMainCalendarView: View {
                                         
                                         // Event Card
                                         HStack(spacing: 16) {
-                                            // Large Event Icon
+                                            // Large Event Icon or Photo
                                             ZStack {
                                                 RoundedRectangle(cornerRadius: 20)
                                                     .fill(Color.blue.opacity(0.15))
                                                     .frame(width: 80, height: 80)
                                                 
-                                                Text(event.emoji)
-                                                    .font(.system(size: 40))
+                                                if let photo = event.photo {
+                                                    Image(uiImage: photo)
+                                                        .resizable()
+                                                        .scaledToFill()
+                                                        .frame(width: 80, height: 80)
+                                                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                                                } else {
+                                                    Text(event.icon)
+                                                        .font(.system(size: 40))
+                                                }
                                             }
                                             
                                             // Event Details
                                             VStack(alignment: .leading, spacing: 6) {
-                                                Text(event.name)
+                                                Text(event.displayName)
                                                     .font(.system(size: 20, weight: .bold))
                                                     .foregroundColor(.primary)
                                                 
@@ -1646,12 +1691,16 @@ struct AddSpecialDayView: View {
     enum EventType: CaseIterable {
         case birthday
         case anniversary
+        case graduation
+        case wedding
         case custom
         
         var title: String {
             switch self {
             case .birthday: return "Birthday"
             case .anniversary: return "Anniversary"
+            case .graduation: return "Graduation"
+            case .wedding: return "Wedding"
             case .custom: return "Your Own Occasion"
             }
         }
@@ -1660,6 +1709,8 @@ struct AddSpecialDayView: View {
             switch self {
             case .birthday: return "🎂"
             case .anniversary: return "💍"
+            case .graduation: return "🎓"
+            case .wedding: return "💒"
             case .custom: return "🎉"
             }
         }
@@ -1668,6 +1719,8 @@ struct AddSpecialDayView: View {
             switch self {
             case .birthday: return "birthday.cake.fill"
             case .anniversary: return "heart.fill"
+            case .graduation: return "graduationcap.fill"
+            case .wedding: return "heart.circle.fill"
             case .custom: return "sparkles"
             }
         }
@@ -1676,6 +1729,8 @@ struct AddSpecialDayView: View {
             switch self {
             case .birthday: return Color(red: 1.0, green: 0.6, blue: 0.7)
             case .anniversary: return Color(red: 0.9, green: 0.4, blue: 0.6)
+            case .graduation: return Color(red: 0.4, green: 0.6, blue: 0.9)
+            case .wedding: return Color(red: 0.95, green: 0.85, blue: 0.9)
             case .custom: return Color(red: 0.4, green: 0.6, blue: 0.9)
             }
         }
@@ -2078,6 +2133,8 @@ struct FunEventTypeRow: View {
         switch eventType {
         case .birthday: return "🎂"
         case .anniversary: return "💍"
+        case .graduation: return "🎓"
+        case .wedding: return "💒"
         case .custom: return "🎨"
         }
     }
@@ -2093,6 +2150,18 @@ struct FunEventTypeRow: View {
         case .anniversary:
             return LinearGradient(
                 colors: [Color.red.opacity(0.8), Color.pink.opacity(0.8)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .graduation:
+            return LinearGradient(
+                colors: [Color.blue.opacity(0.8), Color.cyan.opacity(0.8)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .wedding:
+            return LinearGradient(
+                colors: [Color.pink.opacity(0.6), Color.purple.opacity(0.6)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
